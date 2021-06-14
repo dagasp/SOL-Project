@@ -11,6 +11,10 @@
 #include <sys/un.h>
 
 
+//MyHeaders
+#include "util.h"
+#include "hash.h"
+
 int main (int argc, char **argv) {
 
     //Maschere per i segnali 

@@ -23,4 +23,4 @@ int writeFile(const char, *pathname, const char *dirname);
 
 int appendToFile(const char *pathname, void *buf, size_t size, const char *dirname);
 
-int closeFile(const char *pathname);
+int closeFile(const char *pathname); //prova

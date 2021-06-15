@@ -6,6 +6,9 @@
  *   \retval  0   se durante la lettura da fd leggo EOF
  *   \retval size se termina con successo
  */
+
+config_file *read_config(char *config);
+
 static inline int readn(long fd, void *buf, size_t size) {
     size_t left = size;
     int r;

@@ -22,7 +22,7 @@
 
 /*Header contenente funzioni utilità e strutture dati d'appoggio*/
 typedef struct config_file {
-    int memory_space;
+    long memory_space;
     unsigned int num_of_threads;
     char sock_name[BUFSIZE];
 } config_file;

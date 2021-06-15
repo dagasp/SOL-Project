@@ -23,7 +23,7 @@ typedef struct config_file {
     char sock_name[BUF_DIM];
 } config_file;
 
-config_file *read_config(char *config) {} //Funzione che legge i dati dal file config.txt - da implementare
+config_file *read_config(char *config); //Funzione che legge i dati dal file config.txt - da implementare
 
 
 

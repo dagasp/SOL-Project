@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <sys/select.h>
 #include <sys/un.h>
+#include <time.h>
 
 /*API d'appoggio al Client*/
 

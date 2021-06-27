@@ -14,9 +14,16 @@
 //MyHeaders
 #include "util.h"
 #include "hash.h"
+#include "threadpool.h"
+
+static config_file *conf;
 
 int main (int argc, char **argv) {
-
+    if ((conf = read_config("./test/config.txt")) == NULL) {
+        fprintf(stderr, "Errore nella lettura del file config.txt\n");
+        exit(EXIT_FAILURE);
+    }
+    int num_of_threads_in_pool;
     //Maschere per i segnali 
     sigset_t mask;
     sigemptyset(&mask);
@@ -26,6 +33,6 @@ int main (int argc, char **argv) {
     
     if (pthread_sigmask(SIG_BLOCK, &mask,NULL) != 0) {
 	    fprintf(stderr, "FATAL ERROR\n");
-	    goto _exit;
+        exit(EXIT_FAILURE);
     }
 }

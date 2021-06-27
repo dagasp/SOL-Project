@@ -27,10 +27,8 @@ node *pop(fqueue *queue) {
     if (queue == NULL)
         return NULL;
     node *n = (node*)queue->head;
-    node *saved_node = queue->head;
     queue->head = queue->head->next;
-    free(n);
-    return saved_node;
+    return n;
 }
 
 void dequeue (fqueue *queue) {

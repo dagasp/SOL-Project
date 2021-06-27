@@ -21,7 +21,7 @@ void send_request () {
     int err_code;
     node *n;
     n = pop(queue);
-    int opt = n->op_code
+    int opt = n->op_code;
     switch (opt) {
         case 'r':
             

@@ -7,7 +7,7 @@ config_file *read_config(char *config) {
     char *buf;
     long num;
     int line = 0;
-    if ((fd=fopen(config), "r") == NULL) {
+    if (fd=fopen(config, "r") == NULL) {
         fclose(fd);
         fprintf(stderr, "Apertura file - FATAL ERROR\n");
         return NULL;
@@ -31,7 +31,7 @@ config_file *read_config(char *config) {
                     conf->num_of_threads = (int*) num;
                 }
                 else {
-                    fprintf("Errore nel config file, il parametro non è un numero!\n");
+                    fprintf(stderr, "Errore nel config file, il parametro 'number of threads' non è un numero!\n");
                     return NULL;
                 }
                 break;
@@ -40,16 +40,23 @@ config_file *read_config(char *config) {
                     conf->memory_space = num;
                 }
                 else {
-                    fprintf("Errore nel config file, il parametro non è un numero!\n");
+                    fprintf(stderr, "Errore nel config file, il parametro 'memory space' non è un numero!\n");
                     return NULL;
                 }
                 break;
             case 2:
                 if (isNumber(buf, &num) == 0) {
-                    fprintf(stderr, "Errore nel config file, il paramentro non è una stringa!\n");
+                    fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
                 }
-                strcpy(conf->sockname, buf);
+                strcpy(conf->sock_name, buf);
+                break;
+            case 3:
+                if (isNumber(buf, &num) == 0) {
+                    fprintf(stderr, "Errore nel config file, il parametro 'directory' non è una stringa!\n");
+                    return NULL;
+                }
+                strcpy(conf->directory, buf);
                 break;
             default:
                 break;

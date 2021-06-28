@@ -56,9 +56,9 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     client_operations *client_op;
     server_reply *server_rep;
     client_op->op_code = READFILE;
-    client_op->pathname = pathname;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n");
-    SYSCALL_RETURN("readn", n, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n");
+    strcpy(client_op->pathname, pathname);
+    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
     if (server_rep->reply_code == -1) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;
@@ -76,7 +76,19 @@ memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di s
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */
 int readNFiles(int N, const char *dirname) {
-    client_operations client_op;
-    client_op.op_code = READFILE;
+    client_operations *client_op;
+    server_reply *server_rep;
+    client_op->op_code = READFILE;
+    int files_letti = 0;
+    int n;
+    SYSCALL_RETURN("writen", n, writen(fd_skt, N, sizeof(int)), "Impossibile inviare richiesta al server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+    FILE *fp;
+    files_letti = server_rep->n_files_letti;
+    for (int i = 0; i < files_letti; i++) { //supponendo cartella esista, da implementare se cartella non esiste
+        char *path = strcat(dirname, server_rep->pathname); //da estrarre path assoluto
+        fp = fopen(path, "w+"); 
+    }
+
 }
 

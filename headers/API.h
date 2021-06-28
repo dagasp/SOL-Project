@@ -36,6 +36,7 @@ typedef struct server_reply {
     char data[BUFSIZE];
     unsigned int size;
     unsigned int reply_code;
+    int n_files_letti;
 } server_reply;
 
 /*API d'appoggio al Client*/

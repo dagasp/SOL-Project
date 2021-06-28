@@ -25,6 +25,7 @@ typedef struct config_file {
     long memory_space;
     unsigned int num_of_threads;
     char sock_name[BUFSIZE];
+    char directory[BUFSIZE];
 } config_file;
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\

@@ -34,7 +34,7 @@ icl_hash_t *
 icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*) );
 
 void
-* icl_hash_find(icl_hash_t *, void* );
+* icl_hash_find(icl_hash_t *, void* key);
 
 icl_entry_t
 * icl_hash_insert(icl_hash_t *, void*, void *),

@@ -18,10 +18,15 @@
 
 #include "util.h"
 
+#define O_CREATE 0
+#define O_LOCK 1
+
 enum OP_CODE {
     OPENFILE = 0,
     READFILE = 1,
-    WRITEFILE = 2
+    READNFILES = 2,
+    WRITEFILE = 3,
+    APPENDTOFILE = 4
 };
 
 typedef struct client_operations {
@@ -29,6 +34,7 @@ typedef struct client_operations {
     char data[BUFSIZE];
     unsigned int op_code;
     int flags;
+    int feedback;
 } client_operations;
 
 typedef struct server_reply {

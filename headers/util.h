@@ -20,6 +20,15 @@
 #define EXTRA_LEN_PRINT_ERROR   512
 #endif
 
+#if !defined (SUCCESS)
+#define SUCCESS 0 
+#endif
+
+#if !defined (FAILED)
+#define FAILED -1 
+#endif
+
+
 /*Header contenente funzioni utilità e strutture dati d'appoggio*/
 typedef struct config_file {
     long memory_space;

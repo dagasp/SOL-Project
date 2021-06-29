@@ -15,8 +15,72 @@
 #include "util.h"
 #include "hash.h"
 #include "threadpool.h"
+#include "api.h"
 
 static config_file *conf;
+
+icl_hash_t *hTable = icl_hash_create(20,NULL, NULL);
+
+
+void threadWorker(void *arg) {
+    int connFd = (int*) arg[0]; //supponendo che il desc. socket mi venga passato come arg.
+    int r;
+    server_reply *server_rep;
+    client_operations *client_op;
+    SYSCALL_RETURN("readn", r, readn(connFd, client_op, sizeof(server_rep)), "Impossibile leggere dati dal client\n", "");
+    int op_code = client_op->op_code;
+    switch (op_code) {
+        case OPENFILE:
+        /*Richiesta di apertura o di creazione di un file. La semantica della openFile dipende dai flags passati come secondo
+argomento che possono essere O_CREATE ed O_LOCK. Se viene passato il flag O_CREATE ed il file esiste già
+memorizzato nel server, oppure il file non esiste ed il flag O_CREATE non è stato specificato, viene ritornato un
+errore. In caso di successo, il file viene sempre aperto in lettura e scrittura, ed in particolare le scritture possono
+avvenire solo in append. Se viene passato il flag O_LOCK (eventualmente in OR con O_CREATE) il file viene
+aperto e/o creato in modalità locked, che vuol dire che l’unico che può leggere o scrivere il file ‘pathname’ è il
+processo che lo ha aperto. Il flag O_LOCK può essere esplicitamente resettato utilizzando la chiamata unlockFile,
+descritta di seguito.
+Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opportunamente.
+*/
+        switch(client_op->flags) {
+            case O_CREATE:
+                if (icl_hash_find(hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
+                    int feedback = FAILED
+                    SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Il file esiste già!\n", ""); //tornerà un feedback d'errore
+                } 
+                else { //Creo il file
+                    icl_hash_insert(hTable, client_op->pathname, (void*)NULL) //per ora NULL, poi vedere se stanziare memoria per buffer
+                    printf("File creato correttamente\n");
+                    int feedback = SUCCESS;
+                    SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Impossibile mandare feedback al client!\n", "");
+                }
+                break;
+            case O_LOCK:
+                printf("Flag non supportato\n");
+                int feedback = FAILED;
+                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int))); //tornerà un feedback d'errore
+                break;
+            default:
+                printf("Flag non specificato\n");
+                int feedback = FAILED;
+                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int))); //tornerà un feedback d'errore
+                break;
+        }
+            break;
+        case READFILE:
+            break;
+        case READNFILES:
+            break;
+        case WRITEFILE:
+            break;
+        case APPENDTOFILE:
+            break;
+        default:
+            break;
+    }
+}
+
+
+
 
 int main (int argc, char **argv) {
     if ((conf = read_config("./test/config.txt")) == NULL) {

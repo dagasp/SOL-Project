@@ -11,13 +11,13 @@ int openConnection(const char *sockname, int msec, const struct timespec abstime
     memset(&sa, '0', sizeof(sa));
     strncpy(sa.sun_path, sockname,UNIX_PATH_MAX);
     sa.sun_family=AF_UNIX;
-    SYSCALL_RETURN("socket", fd_skt,socket(AF_UNIX,SOCK_STREAM,0), "Errore nella creazione del socket\n");
+    SYSCALL_RETURN("socket", fd_skt,socket(AF_UNIX,SOCK_STREAM,0), "Errore nella creazione del socket\n", "");
     const struct timespec current_time;
-    SYSCALL_RETURN("clock_getime, "r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n");
+    SYSCALL_RETURN("clock_getime, "r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     while (r = connect(fd_skt,(struct sockaddr*)&sa,sizeof(sa)) != 0 && abstime.tv_sec > current_time.tv_sec) {
         usleep(msec * 1000);
         r = 0;
-        SYSCALL_RETURN("clock_getime, "r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n");
+        SYSCALL_RETURN("clock_getime, "r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     }
     if (r != -1)
         return 0;
@@ -40,8 +40,10 @@ int openFile(const char *pathname, int flags) {
     client_op->flags = flags;
     client_op->op_code = OPENFILE;
     int n, rep_code;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di apertura file\n");
-    SYSCALL_RETURN("readn", n, readn(fd_skt, &rep_code, sizeof(int)), "Errore, impossibile ricevere risposta dal Server\n");
+    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di apertura file\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &rep_code, sizeof(int)), "Errore, impossibile ricevere risposta dal Server\n", "");
+    if (client_op->feedback == -1) 
+        return client_op->feedback;
     //da settare errno
 }
 
@@ -58,16 +60,17 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     client_op->op_code = READFILE;
     strcpy(client_op->pathname, pathname);
     SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
-    SYSCALL_RETURN("readn", n, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+    //Farsi mandare dal server la strlen del buffer da scrivere ---
+    SYSCALL_RETURN("readn", *size, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
     if (server_rep->reply_code == -1) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;
     } 
     else {
-        strcpy(*buf, server_rep->data);
+        buf = &server_rep->data;
         size = strlen(*buf);
     }
-    //settare errno
+    //settare errno e occuparsi di questo -> In caso di errore, ‘buf‘e ‘size’ non sono validi
 }
 
 /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
@@ -78,7 +81,7 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
 int readNFiles(int N, const char *dirname) {
     client_operations *client_op;
     server_reply *server_rep;
-    client_op->op_code = READFILE;
+    client_op->op_code = READNFILES;
     int files_letti = 0;
     int n;
     SYSCALL_RETURN("writen", n, writen(fd_skt, N, sizeof(int)), "Impossibile inviare richiesta al server\n", "");
@@ -88,7 +91,8 @@ int readNFiles(int N, const char *dirname) {
     for (int i = 0; i < files_letti; i++) { //supponendo cartella esista, da implementare se cartella non esiste
         char *path = strcat(dirname, server_rep->pathname); //da estrarre path assoluto
         fp = fopen(path, "w+"); 
+        
     }
-
+    return files_letti;
 }
 

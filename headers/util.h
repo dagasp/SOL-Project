@@ -12,6 +12,8 @@
 #include <pthread.h>
 #include <errno.h>
 
+#include "hash.h"
+
 #if !defined(BUFSIZE)
 #define BUFSIZE 256
 #endif
@@ -36,6 +38,11 @@ typedef struct config_file {
     char sock_name[BUFSIZE];
     char directory[BUFSIZE];
 } config_file;
+
+typedef struct args {
+  long sock_fd;
+  icl_hash_t *hTable;
+} wargs;
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\
     if ((r=sc) == -1) {				\

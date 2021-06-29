@@ -18,12 +18,12 @@
 #include "api.h"
 
 static config_file *conf;
-
-icl_hash_t *hTable = icl_hash_create(20,NULL, NULL);
-
+static wargs *w_args;
 
 void threadWorker(void *arg) {
-    int connFd = (int*) arg[0]; //supponendo che il desc. socket mi venga passato come arg.
+    assert(arg);
+    w_args = arg;
+    long connFd = w_args->sock_fd;
     int r;
     server_reply *server_rep;
     client_operations *client_op;
@@ -43,12 +43,12 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 */
         switch(client_op->flags) {
             case O_CREATE:
-                if (icl_hash_find(hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
-                    int feedback = FAILED
+                if (icl_hash_find(w_args->hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
+                    int feedback = FAILED;
                     SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Il file esiste già!\n", ""); //tornerà un feedback d'errore
                 } 
                 else { //Creo il file
-                    icl_hash_insert(hTable, client_op->pathname, (void*)NULL) //per ora NULL, poi vedere se stanziare memoria per buffer
+                    icl_hash_insert(w_args->hTable, client_op->pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
                     SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Impossibile mandare feedback al client!\n", "");
@@ -57,16 +57,30 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
             case O_LOCK:
                 printf("Flag non supportato\n");
                 int feedback = FAILED;
-                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int))); //tornerà un feedback d'errore
+                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Errore - Impossibile mandare feedback\n", ""); //tornerà un feedback d'errore
                 break;
             default:
                 printf("Flag non specificato\n");
                 int feedback = FAILED;
-                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int))); //tornerà un feedback d'errore
+                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)),"Errore - Impossibile mandare feedback\n", ""); //tornerà un feedback d'errore
                 break;
         }
             break;
         case READFILE:
+        /*Legge tutto il contenuto del file dal server (se esiste) ritornando un puntatore ad un'area allocata sullo heap nel
+parametro ‘buf’, mentre ‘size’ conterrà la dimensione del buffer dati (ossia la dimensione in bytes del file letto). In
+caso di errore, ‘buf‘e ‘size’ non sono validi. Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene
+settato opportunamente.
+*/
+        void *buf = icl_hash_find(w_args->hTable, client_op->pathname);  
+        if (buf = NULL) {
+            fprintf(stderr, "Errore, file non trovato\n");
+            server_rep->reply_code = FAILED; //-1
+            SYSCALL_RETURN("writen", r, writen(connFd, server_rep, sizeof(server_rep)),"Errore - Impossibile rispondere al client\n", ""); //tornerà un feedback d'errore
+        }
+        server_rep->reply_code = SUCCESS;
+        strcpy(server_rep->data, buf);
+        SYSCALL_RETURN("writen", r, writen(connFd, server_rep, sizeof(server_rep)),"Errore - Impossibile rispondere al client\n", "");
             break;
         case READNFILES:
             break;
@@ -83,6 +97,8 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 
 
 int main (int argc, char **argv) {
+    icl_hash_t *hTable = NULL;
+    hTable = icl_hash_create(20,NULL, NULL);
     if ((conf = read_config("./test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);

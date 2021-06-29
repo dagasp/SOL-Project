@@ -62,7 +62,7 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
     //Farsi mandare dal server la strlen del buffer da scrivere ---
     SYSCALL_RETURN("readn", *size, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
-    if (server_rep->reply_code == -1) { //Il server ritorna un errore, non ha letto il file
+    if (server_rep->reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;
     } 

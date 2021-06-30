@@ -25,9 +25,12 @@ void threadWorker(void *arg) {
     w_args = arg;
     long connFd = w_args->sock_fd;
     int r;
-    server_reply *server_rep;
-    client_operations *client_op;
-    SYSCALL_RETURN("readn", r, readn(connFd, client_op, sizeof(server_rep)), "Impossibile leggere dati dal client\n", "");
+    server_reply *server_rep = NULL; 
+    client_operations *client_op = NULL;
+    if ((r = readn(connFd, client_op, sizeof(server_rep))) < 0) {
+        fprintf(stderr, "Impossibile leggere dal client\n");
+        return;
+    }
     int op_code = client_op->op_code;
     switch (op_code) {
         case OPENFILE:
@@ -45,24 +48,28 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
             case O_CREATE:
                 if (icl_hash_find(w_args->hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
                     int feedback = FAILED;
-                    SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Il file esiste già!\n", ""); //tornerà un feedback d'errore
+                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
+                        break;
                 } 
                 else { //Creo il file
                     icl_hash_insert(w_args->hTable, client_op->pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
-                    SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Impossibile mandare feedback al client!\n", "");
+                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
+                        break;
                 }
                 break;
             case O_LOCK:
                 printf("Flag non supportato\n");
                 int feedback = FAILED;
-                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)), "Errore - Impossibile mandare feedback\n", ""); //tornerà un feedback d'errore
+                if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
+                        break;
                 break;
             default:
                 printf("Flag non specificato\n");
-                int feedback = FAILED;
-                SYSCALL_RETURN("writen", r, writen(connFd, &feedback, sizeof(int)),"Errore - Impossibile mandare feedback\n", ""); //tornerà un feedback d'errore
+                int fb = FAILED;
+                if ((r = writen(connFd, &fb, sizeof(int))) < 0)
+                        break;
                 break;
         }
             break;
@@ -71,16 +78,17 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 parametro ‘buf’, mentre ‘size’ conterrà la dimensione del buffer dati (ossia la dimensione in bytes del file letto). In
 caso di errore, ‘buf‘e ‘size’ non sono validi. Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene
 settato opportunamente.
-*/
-        void *buf = icl_hash_find(w_args->hTable, client_op->pathname);  
-        if (buf = NULL) {
+*/      ;
+        void *buf = icl_hash_find(w_args->hTable, client_op->pathname);
+        if (buf == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep->reply_code = FAILED; //-1
-            SYSCALL_RETURN("writen", r, writen(connFd, server_rep, sizeof(server_rep)),"Errore - Impossibile rispondere al client\n", ""); //tornerà un feedback d'errore
+            if ((r = writen(connFd, server_rep, sizeof(server_rep))))
+                break;
         }
         server_rep->reply_code = SUCCESS;
         strcpy(server_rep->data, buf);
-        SYSCALL_RETURN("writen", r, writen(connFd, server_rep, sizeof(server_rep)),"Errore - Impossibile rispondere al client\n", "");
+        if ((r = writen(connFd, server_rep, sizeof(server_rep))))
             break;
         case READNFILES:
             break;
@@ -103,7 +111,7 @@ int main (int argc, char **argv) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
     }
-    int num_of_threads_in_pool;
+    //int num_of_threads_in_pool;
     //Maschere per i segnali 
     sigset_t mask;
     sigemptyset(&mask);

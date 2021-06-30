@@ -19,6 +19,11 @@
 
 static config_file *conf;
 static wargs *w_args;
+static icl_hash_t *hTable;
+
+void initialize_table () {
+    hTable = icl_hash_create(20, NULL, NULL);
+}
 
 void threadWorker(void *arg) {
     assert(arg);
@@ -34,25 +39,15 @@ void threadWorker(void *arg) {
     int op_code = client_op->op_code;
     switch (op_code) {
         case OPENFILE:
-        /*Richiesta di apertura o di creazione di un file. La semantica della openFile dipende dai flags passati come secondo
-argomento che possono essere O_CREATE ed O_LOCK. Se viene passato il flag O_CREATE ed il file esiste già
-memorizzato nel server, oppure il file non esiste ed il flag O_CREATE non è stato specificato, viene ritornato un
-errore. In caso di successo, il file viene sempre aperto in lettura e scrittura, ed in particolare le scritture possono
-avvenire solo in append. Se viene passato il flag O_LOCK (eventualmente in OR con O_CREATE) il file viene
-aperto e/o creato in modalità locked, che vuol dire che l’unico che può leggere o scrivere il file ‘pathname’ è il
-processo che lo ha aperto. Il flag O_LOCK può essere esplicitamente resettato utilizzando la chiamata unlockFile,
-descritta di seguito.
-Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opportunamente.
-*/
         switch(client_op->flags) {
             case O_CREATE:
-                if (icl_hash_find(w_args->hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
+                if (icl_hash_find(hTable, (void*) client_op->pathname) != NULL) { // != NULL -> file esiste
                     int feedback = FAILED;
                     if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
                         break;
                 } 
                 else { //Creo il file
-                    icl_hash_insert(w_args->hTable, client_op->pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
+                    icl_hash_insert(hTable, client_op->pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
                     if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
@@ -73,25 +68,41 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
                 break;
         }
             break;
-        case READFILE:
-        /*Legge tutto il contenuto del file dal server (se esiste) ritornando un puntatore ad un'area allocata sullo heap nel
-parametro ‘buf’, mentre ‘size’ conterrà la dimensione del buffer dati (ossia la dimensione in bytes del file letto). In
-caso di errore, ‘buf‘e ‘size’ non sono validi. Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene
-settato opportunamente.
-*/      ;
-        void *buf = icl_hash_find(w_args->hTable, client_op->pathname);
+        case READFILE:    ;
+        void *buf = icl_hash_find(hTable, client_op->pathname);
         if (buf == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep->reply_code = FAILED; //-1
-            if ((r = writen(connFd, server_rep, sizeof(server_rep))))
+            if ((r = writen(connFd, server_rep, sizeof(server_rep))) < 0)
                 break;
         }
         server_rep->reply_code = SUCCESS;
         strcpy(server_rep->data, buf);
         if ((r = writen(connFd, server_rep, sizeof(server_rep))))
             break;
-        case READNFILES:
+        case READNFILES: {
+        /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
+ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al server è quella di leggere tutti i file
+memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
+effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
+*/      int n_of_files;
+        if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0)
             break;
+        int available_files = get_n_entries(hTable);
+        if (n_of_files <= 0) { //Il server deve leggere tutti i file
+        int n_stored_files = available_files;
+        if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) //Dico al client quanti file invierò
+                    break;
+            while (n_stored_files > 0) {
+                //implementare funzione che legge tutti i files disponibili
+                n_stored_files--;
+            }
+        }
+        if (available_files < n_of_files) {
+            //deve inviare tutti i files disponibili
+        } 
+        //deve inviare N files
+        }
         case WRITEFILE:
             break;
         case APPENDTOFILE:
@@ -105,8 +116,7 @@ settato opportunamente.
 
 
 int main (int argc, char **argv) {
-    icl_hash_t *hTable = NULL;
-    hTable = icl_hash_create(20,NULL, NULL);
+    initialize_table();
     if ((conf = read_config("./test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);

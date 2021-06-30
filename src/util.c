@@ -7,7 +7,7 @@ config_file *read_config(char *config) {
     char *buf;
     long num;
     int line = 0;
-    if (fd=fopen(config, "r") == NULL) {
+    if ((fd=fopen(config, "r")) == NULL) {
         fclose(fd);
         fprintf(stderr, "Apertura file - FATAL ERROR\n");
         return NULL;
@@ -28,7 +28,7 @@ config_file *read_config(char *config) {
         switch (line) {
             case 0: 
                 if (isNumber(buf, &num) == 0) {
-                    conf->num_of_threads = (int*) num;
+                    conf->num_of_threads = num;
                 }
                 else {
                     fprintf(stderr, "Errore nel config file, il parametro 'number of threads' non è un numero!\n");

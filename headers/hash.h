@@ -54,6 +54,7 @@ hash_pjw(void* key);
 int 
 string_compare(void* a, void* b);
 
+int get_n_entries (icl_hash_t *);
 
 #define icl_hash_foreach(ht, tmpint, tmpent, kp, dp)    \
     for (tmpint=0;tmpint<ht->nbuckets; tmpint++)        \

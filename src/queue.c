@@ -7,7 +7,7 @@ fqueue *create () {
     return queue;
 }
 
-void insert (fqueue *queue, const char opcode, void *value) {
+void insert (fqueue *queue, unsigned int opcode, void *value) {
     node *tmp = malloc(sizeof(struct node));
     tmp->op_code = opcode;
     tmp->data = value;

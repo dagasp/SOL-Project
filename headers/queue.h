@@ -2,7 +2,7 @@
 #include <stdlib.h>
 
 typedef struct node {
-    const char op_code;
+    unsigned int op_code;
     void *data;
     struct node *next;
 } node;
@@ -14,7 +14,7 @@ typedef struct {
 
 fqueue *create ();
 
-void insert (fqueue *queue, const char opcode, void *value);
+void insert (fqueue *queue, unsigned int opcode, void *value);
 
 node *pop(fqueue *queue);
 

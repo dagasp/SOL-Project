@@ -18,7 +18,7 @@ void print_usage(const char *program_name) {
 }
 
 fqueue *queue; //Coda delle richieste da inviare al server
-config_file *config;
+config_file *config; //File di config -- contiene il nome del sockname a cui connettersi e la directory in cui salvare i files
 
 void configuration () {
     if ((config = read_config("./test/config.txt")) == NULL) {
@@ -30,10 +30,12 @@ void configuration () {
 void send_request () {
     //int err_code;
     node *n = malloc(sizeof(node));
-    n = pop(queue);
+    n = pop(queue);   
     char opt = n->op_code;
     switch (opt) {
         case 'r': { //Invio richiesta al server di lettura dei files tramite API readFile
+            printf("Sono nella readFile lato client\n");
+            printf("OP CODE: %c\n", opt);
             int err_code;
             size_t size;
             char *buf = malloc(sizeof(char)*BUFSIZE);
@@ -41,10 +43,20 @@ void send_request () {
                 fprintf(stderr, "Errore fatale nella malloc\n");
                 exit(EXIT_FAILURE); 
              }
-            SYSCALL_PRINT("readFile", err_code, readFile(n->data, (void**) (&buf),&size) ,"Errore nella readFile\n","");
-            printf("Letti %ld bytes\n", size);
+            if ((err_code = openFile((char*)n->data, 0) != 0)) {
+                printf("Impossibile aprire il file\n");
+                break;
+            }
+            else    
+                printf("File aperto\n");
+            if  ((err_code = readFile((char*)n->data, (void**) (&buf),&size) == 0)) {
+                 printf("Letti %ld bytes\n", size);
+            }
+            else 
+                printf("Non è stato possibile aprire e leggere il file\n");
+            //printf("FILE RICEVUTO: %s\n", (char*)buf);
             //da implementare stampa;
-            free(buf);
+            //free(buf);
             break;
         }
         case 'R': {//Invio richiesta al server di lettura di N files
@@ -80,6 +92,7 @@ int main(int argc, char **argv) {
                 break;
             }
             case 'r': {
+                printf("E' stata chiesta la readFile\n");
                 data = optarg;
                 insert(queue, 'r', (void*)data);
                 //inserire richiesta in lista -
@@ -102,7 +115,7 @@ int main(int argc, char **argv) {
     if ((config = read_config("../test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
-    }
+    } //Lettura parametri dal file config
     //--- Connetto al socket --- 
     struct timespec time;
     clock_gettime(CLOCK_REALTIME, &time);
@@ -110,8 +123,7 @@ int main(int argc, char **argv) {
     openConnection(config->sock_name, 1000, time);
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request();
-        queue->head = queue->head->next;
+        //queue->head = queue->head->next;
     }
     return 0;
-    free(queue);
 }

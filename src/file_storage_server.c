@@ -76,67 +76,110 @@ void threadWorker(void *arg) {
     long* args = (long*)arg;
     long connFd = args[0];
     //long* termina = (long*)(args[1]);
-	int req_pipe = (int) args[2];
+	int req_pipe = (int) args[1];
     free(arg);
     int r;
     server_reply server_rep;
     client_operations client_op;
+    file file;
+    file.status = CLOSED;
     msg msg;
     memset(&client_op, 0, sizeof(client_op));
     memset(&server_rep, 0, sizeof(server_rep));
     memset(&msg, 0, sizeof(msg));
-    if ((r = readn(connFd, &client_op, sizeof(server_rep))) < 0) {
+    //memset(&file, 0, sizeof(file));
+    if ((r = readn(connFd, (void*)&client_op, sizeof(server_rep))) < 0) {
         fprintf(stderr, "Impossibile leggere dal client\n");
         return;
     }
+    if (r == 0) { //Il client ha finito le richieste
+        close(connFd);
+        return;
+    }
+    printf("OP CODE RICEVUTO DAL SERVER: %d\n", client_op.op_code);
+    printf("PATHNAME RICEVUTO: %s\n", client_op.pathname);
     int op_code = client_op.op_code;
     switch (op_code) {
-        case OPENFILE: {
-        switch(client_op.flags) {
-            case O_CREATE:
+     case OPENFILE:
+        //printf("FLAGS: %d\n", client_op.flags);
+           if (client_op.flags == O_CREATE) {
                 if (icl_hash_find(hTable, (void*) client_op.pathname) != NULL) { // != NULL -> file esiste
+                    printf("File esiste + OCREATE\n");
                     int feedback = FAILED;
-                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
+                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
+                        perror("writen");
                         break;
+                    }
+                    break;
                 } 
                 else { //Creo il file
                     icl_hash_insert(hTable, client_op.pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
-                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
+                    file.status = OPEN;
+                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
+                        perror("writen");
                         break;
+                    }
                     break;
                 }
-                break;
-            case O_LOCK:
+           }    
+            else if (client_op.flags == O_LOCK) {
                 printf("Flag non supportato\n");
                 int feedback = FAILED;
-                if ((r = writen(connFd, &feedback, sizeof(int))) < 0)
-                        break;
+                if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
+                    perror("writen");
+                    break;
+                }  
                 break;
-            default:
-                printf("Flag non specificato\n");
-                int fb = FAILED;
-                if ((r = writen(connFd, &fb, sizeof(int))) < 0)
+            }
+            else { //Nessun flag specificato - Cerco il file, se esiste lo apro
+                if (icl_hash_find(hTable, (void*) client_op.pathname) == NULL) { // == NULL -> file non esiste
+                    int feedback = FAILED;
+                    if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
+                        perror("writen");
                         break;
+                    }
+                } 
+                else { //File esiste
+                    file.status = OPEN;
+                    int fb = SUCCESS;
+                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                        perror("writen");
+                        break;
+                    }       
+                }
                 break;
-        }
-            break;
-        }
-        case READFILE:    ;
+            }
+        case READFILE: 
         msg.data = icl_hash_find(hTable, client_op.pathname);
         if (msg.data == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep.reply_code = FAILED; //-1
-            if ((r = writen(connFd, &server_rep, sizeof(server_rep))) < 0)
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+                perror("writen");
                 break;
+            }
             break;
         }
-        msg.size = strlen(msg.data);
-        server_rep.reply_code = SUCCESS;
-        memcpy(server_rep.data, msg.data, msg.size);
-        if ((r = writen(connFd, &server_rep, sizeof(server_rep))))
-            break;
+        printf("FILE STATUS NELLA READFILE: %d\n", file.status);
+        if ((file.status == OPEN)) { //Se il file è aperto lo copio
+            msg.size = strnlen(msg.data, BUFSIZE);
+            server_rep.reply_code = SUCCESS;
+            memcpy(server_rep.data, msg.data, msg.size);
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep)))) {
+                perror("writen");
+                break;
+            }
+        }
+        else { //file.status == CLOSED - Il file non è stato aperto, non è stato possibile leggerlo
+            server_rep.reply_code = FAILED;
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep)))) {
+                perror("writen");
+                break;
+            }
+        }
+        break;
         case READNFILES: {
         /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
 ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al server è quella di leggere tutti i file
@@ -167,6 +210,8 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
         default:
             break;
     }
+
+    //Scrivo sulla pipe di comunicazione col main thread il descrittore per segnalare che il worker ha finito
     if (writen(req_pipe, &connFd, sizeof(long)) == -1) {
 		perror("write pipe");
 		return;
@@ -217,13 +262,13 @@ int main (int argc, char **argv) {
 		perror("signal pipe");
 		goto _exit;
     	}
-    
+
+    //Pipe di notifica di una richiesta che è stata servita e il thread è di nuovo pronto per altre richieste
 	int pipe_request[2];
 	if (pipe(pipe_request) == -1) {
 		perror("pipe request");
 		goto _exit;
 	}
-
     pthread_t sighandler_thread;
     sigHandler_t handlerArgs = { &mask, signal_pipe[1] };
    
@@ -264,9 +309,9 @@ int main (int argc, char **argv) {
     FD_ZERO(&set);
     FD_ZERO(&tmpset);
 
-    FD_SET(listenfd, &set);        // aggiungo il listener fd al master set
-    FD_SET(signal_pipe[0], &set);  // aggiungo il descrittore di lettura della signal_pipe
-    FD_SET(pipe_request[0], &set); 
+    FD_SET(listenfd, &set);        
+    FD_SET(signal_pipe[0], &set);  // descrittore di lettura della signal_pipe
+    FD_SET(pipe_request[0], &set); // descrittore di lettura della pipe_request
 
     // tengo traccia del file descriptor con id piu' grande
     int fdmax = (listenfd > signal_pipe[0]) ? listenfd : signal_pipe[0];
@@ -294,16 +339,12 @@ int main (int argc, char **argv) {
 			if (connfd > fdmax)
 				fdmax = connfd;
 		}
-		else if (i == pipe_request[0]) {
+		else if (i == pipe_request[0]) { //Il thread ha servito 
 			int n;
 			long desc;
 			if ((n=readn(pipe_request[0], &desc, sizeof(long))) == -1) {
 				perror("read");
 				continue;
-			}
-			if (n == 0) {
-				printf("im here\n");
-				break;
 			}
 			printf("ThreadWorker ha servito\n");
 			FD_SET(desc, &set);
@@ -316,15 +357,15 @@ int main (int argc, char **argv) {
 		    termina = 1;
 		    break;
 		}
-		else {
+		else { //
 			long* args = malloc(3*sizeof(long));
 		    if (!args) {
 		      perror("FATAL ERROR 'malloc'");
 		      goto _exit;
 		    }
 			args[0] = connfd;
-		    args[1] = (long)&termina;
-			args[2] = (int) pipe_request[1];
+		    //args[1] = (long)&termina;
+			args[1] = (int) pipe_request[1];
 			FD_CLR(i, &set);
 			fdmax = updatemax(set, fdmax);
 		    int r =addToThreadPool(pool, threadWorker, (void*)args);

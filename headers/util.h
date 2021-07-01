@@ -47,6 +47,16 @@ typedef struct msg {
   size_t size;
 } msg;
 
+typedef struct file {
+  unsigned int status;
+  void *data;
+} file;
+
+enum STATUS {
+  OPEN = 0, 
+  CLOSED = 1
+};
+
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\
     if ((r=sc) == -1) {				\
 	perror(#name);				\

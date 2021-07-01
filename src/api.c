@@ -37,15 +37,16 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 */
 
 int openFile(const char *pathname, int flags) {
-    client_operations *client_op = NULL;
-    client_op->flags = flags;
-    client_op->op_code = OPENFILE;
+    client_operations client_op;
+    client_op.flags = flags;
+    client_op.op_code = OPENFILE;
+    strcpy(client_op.pathname,pathname);
     int n, rep_code;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di apertura file\n", "");
+    SYSCALL_RETURN("writen", n, writen(fd_skt, &client_op, sizeof(client_op)), "Errore nell'invio della richiesta di apertura file\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &rep_code, sizeof(int)), "Errore, impossibile ricevere risposta dal Server\n", "");
-    if (client_op->feedback == -1) 
-        return client_op->feedback;
-    return 0;
+    if (rep_code == FAILED) 
+        return FAILED;
+    return SUCCESS;
     //da settare errno
 }
 
@@ -60,11 +61,13 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     client_operations client_op;
     server_reply server_rep;
     memset(&client_op, 0, sizeof(client_op));
+    memset(&server_rep, 0, sizeof(server_rep));
     client_op.op_code = READFILE;
-    strcpy(client_op.pathname, pathname);
-    SYSCALL_RETURN("writen", n, writen(fd_skt, &client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
+    memcpy(client_op.pathname, pathname, strlen(pathname)+1);
+    //strcpy(client_op.pathname, pathname);
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
     //Farsi mandare dal server la strlen del buffer da scrivere ---
-    SYSCALL_RETURN("readn", *size, readn(fd_skt, &server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+    SYSCALL_RETURN("readn", *size, readn(fd_skt, (void*)&server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
     if (server_rep.reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;

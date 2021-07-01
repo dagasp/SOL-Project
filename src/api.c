@@ -57,19 +57,20 @@ settato opportunamente.
 
 int readFile(const char* pathname, void** buf, size_t* size) {
     int n;
-    client_operations *client_op = NULL;
-    server_reply *server_rep = NULL;
-    client_op->op_code = READFILE;
-    strcpy(client_op->pathname, pathname);
-    SYSCALL_RETURN("writen", n, writen(fd_skt, client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
+    client_operations client_op;
+    server_reply server_rep;
+    memset(&client_op, 0, sizeof(client_op));
+    client_op.op_code = READFILE;
+    strcpy(client_op.pathname, pathname);
+    SYSCALL_RETURN("writen", n, writen(fd_skt, &client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
     //Farsi mandare dal server la strlen del buffer da scrivere ---
-    SYSCALL_RETURN("readn", *size, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
-    if (server_rep->reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
+    SYSCALL_RETURN("readn", *size, readn(fd_skt, &server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+    if (server_rep.reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;
     } 
     else {
-        *buf = &server_rep->data;
+        *buf = &server_rep.data;
         *size = strlen(*buf);
     }
     return 0;
@@ -82,22 +83,22 @@ memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di s
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */
 int readNFiles(int N, const char *dirname) {
-    client_operations *client_op = NULL;
-    server_reply *server_rep = NULL;
-    client_op->op_code = READNFILES;
+    //client_operations client_op;
+    server_reply server_rep;
+    //client_op.op_code = READNFILES;
     int files_letti = 0;
     int n;
     SYSCALL_RETURN("writen", n, writen(fd_skt, &N, sizeof(int)), "Impossibile inviare richiesta al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", ""); //Numero files da salvare
     FILE *fp;
     for (int i = 0; i < files_letti; i++) { //supponendo cartella esista, da implementare se cartella non esiste
-        SYSCALL_RETURN("readn", n, readn(fd_skt, server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", ""); //Leggo nome e contenuto
-        char *path = strcat((char*)dirname, server_rep->pathname); //da estrarre path assoluto
-        if ((fp = fopen(path, "w+") == NULL)) {
+        SYSCALL_RETURN("readn", n, readn(fd_skt, &server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", ""); //Leggo nome e contenuto
+        char *path = strcat((char*)dirname, server_rep.pathname); //da estrarre path assoluto
+        if ((fp = fopen(path, "w+")) == NULL) {
             fprintf(stderr, "Errore nell'apertura del file\n");
             return -1;
         }
-        if (fwrite(server_rep->data, sizeof(char), server_rep->size, fp) < 0) {
+        if (fwrite(server_rep.data, sizeof(char), server_rep.size, fp) < 0) {
             fprintf(stderr, "Errore nella scrittura del file\n");
             SYSCALL_EXIT("fclose", n, fclose(fp), "Errore nella chiusura del file\n", "");
             return -1;

@@ -5,11 +5,11 @@ config_file *read_config(char *config) {
     config_file *conf;
     FILE *fd = NULL;
     char *buf;
-    long num;
+    //long num;
     int line = 0;
     if ((fd=fopen(config, "r")) == NULL) {
         fclose(fd);
-        fprintf(stderr, "Apertura file - FATAL ERROR\n");
+        fprintf(stderr, "Errore nell'apertura del file di config\n");
         return NULL;
     }
     conf = malloc(sizeof(config_file));
@@ -27,36 +27,38 @@ config_file *read_config(char *config) {
     while (fgets(buf, BUFSIZE, fd) != NULL) {
         switch (line) {
             case 0: 
-                if (isNumber(buf, &num) == 0) {
+                /*if (isNumber(buf, &num) != 0) {
                     conf->num_of_threads = num;
                 }
                 else {
                     fprintf(stderr, "Errore nel config file, il parametro 'number of threads' non è un numero!\n");
                     return NULL;
-                }
+                }*/
+                conf->num_of_threads = atoi(buf);
                 break;
             case 1:
-                if (isNumber(buf, &num) == 0) {
+               /* if (isNumber(buf, &num) == 0) {
                     conf->memory_space = num;
                 }
                 else {
                     fprintf(stderr, "Errore nel config file, il parametro 'memory space' non è un numero!\n");
                     return NULL;
-                }
+                }*/
+                conf->memory_space = atoi(buf);
                 break;
             case 2:
-                if (isNumber(buf, &num) == 0) {
+                /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
-                }
-                strcpy(conf->sock_name, buf);
+                }*/
+                strncpy(conf->sock_name, buf, BUFSIZE);
                 break;
             case 3:
-                if (isNumber(buf, &num) == 0) {
+                /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'directory' non è una stringa!\n");
                     return NULL;
-                }
-                strcpy(conf->directory, buf);
+                }*/
+                strncpy(conf->directory, buf, BUFSIZE);
                 break;
             default:
                 break;

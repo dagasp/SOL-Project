@@ -30,6 +30,9 @@
 #define FAILED -1 
 #endif
 
+#if !defined(MAXBACKLOG)
+#define MAXBACKLOG   32
+#endif
 
 /*Header contenente funzioni utilità e strutture dati d'appoggio*/
 typedef struct config_file {
@@ -39,10 +42,10 @@ typedef struct config_file {
     char directory[BUFSIZE];
 } config_file;
 
-typedef struct args {
-  long sock_fd;
-  icl_hash_t *hTable;
-} wargs;
+typedef struct msg {
+  char *data;
+  size_t size;
+} msg;
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\
     if ((r=sc) == -1) {				\

@@ -64,6 +64,28 @@ int get_n_entries(icl_hash_t *t) {
     return (t->nentries);
 }
 
+int open_file(icl_hash_t *t, void *key) {
+    icl_entry_t* curr;
+    unsigned int hash_val;
+    hash_val = (*t->hash_function)(key) % t->nbuckets;
+    for (curr=t->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if ( t->hash_key_compare(curr->key, key)) { //File found, try to open it
+            curr->status = OPEN;
+            return OPEN; //0 
+        }
+    return -1; //Couldn't open the file for some reason 
+}
+
+int is_file_open(icl_hash_t *t, void *key) {
+    icl_entry_t* curr;
+    unsigned int hash_val;
+    hash_val = (*t->hash_function)(key) % t->nbuckets;
+    for (curr=t->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if (t->hash_key_compare(curr->key, key)) { 
+            return curr->status;
+        }
+    return -1; 
+}
 /**
  * Create a new hash table.
  *
@@ -156,6 +178,7 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
 
     curr->key = key;
     curr->data = data;
+    curr->status = OPEN;
     curr->next = ht->buckets[hash_val]; /* add at start */
 
     ht->buckets[hash_val] = curr;

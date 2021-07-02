@@ -54,7 +54,7 @@ typedef struct file {
 
 enum STATUS {
   OPEN = 0, 
-  CLOSED = 1
+  CLOSED = -1
 };
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\

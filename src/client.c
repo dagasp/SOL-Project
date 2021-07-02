@@ -30,6 +30,7 @@ void configuration () {
 void send_request () {
     //int err_code;
     node *n = malloc(sizeof(node));
+    msg msg;
     n = pop(queue);   
     char opt = n->op_code;
     switch (opt) {
@@ -38,25 +39,27 @@ void send_request () {
             printf("OP CODE: %c\n", opt);
             int err_code;
             size_t size;
-            char *buf = malloc(sizeof(char)*BUFSIZE);
-            if (!buf) {
-                fprintf(stderr, "Errore fatale nella malloc\n");
-                exit(EXIT_FAILURE); 
-             }
-            if ((err_code = openFile((char*)n->data, 0) != 0)) {
+            if ((err_code = openFile((char*)n->data, 3) != 0)) { //Prova openFile senza specificare flags
                 printf("Impossibile aprire il file\n");
                 break;
             }
+            /*if ((err_code = openFile((char*)n->data, 0) != 0)) {
+                printf("Impossibile aprire il file\n");
+                break;
+            }*/
             else    
                 printf("File aperto\n");
-            if  ((err_code = readFile((char*)n->data, (void**) (&buf),&size) == 0)) {
+            msg.data = malloc(sizeof(char)*BUFSIZE);
+            if (!msg.data) {
+                fprintf(stderr, "Errore nella malloc\n");
+                break;
+            }
+            if  ((err_code = readFile((char*)n->data, (void**) (&msg.data),&size) == 0)) {
                  printf("Letti %ld bytes\n", size);
             }
-            else 
-                printf("Non è stato possibile aprire e leggere il file\n");
-            //printf("FILE RICEVUTO: %s\n", (char*)buf);
+            printf("FILE RICEVUTO: %s\n", (char*)msg.data);
             //da implementare stampa;
-            //free(buf);
+            free(msg.data);
             break;
         }
         case 'R': {//Invio richiesta al server di lettura di N files

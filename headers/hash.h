@@ -11,6 +11,7 @@
 #define icl_hash_h
 
 #include <stdio.h>
+#include "util.h"
 
 #if defined(c_plusplus) || defined(__cplusplus)
 extern "C" {
@@ -19,6 +20,7 @@ extern "C" {
 typedef struct icl_entry_s {
     void* key;
     void *data;
+    int status; //-1 NO, 0 SI
     struct icl_entry_s* next;
 } icl_entry_t;
 
@@ -53,6 +55,10 @@ hash_pjw(void* key);
 /* compare function */
 int 
 string_compare(void* a, void* b);
+
+int open_file(icl_hash_t *, void * key);
+
+int is_file_open(icl_hash_t *, void *key);
 
 int get_n_entries (icl_hash_t *);
 

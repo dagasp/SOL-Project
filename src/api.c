@@ -73,8 +73,8 @@ int readFile(const char* pathname, void** buf, size_t* size) {
         return -1;
     } 
     else {
-        *buf = &server_rep.data;
-        *size = strlen(*buf);
+        memcpy(*buf, server_rep.data, *size);
+        //*size = strlen(*buf);
     }
     return 0;
     //settare errno e occuparsi di questo -> In caso di errore, ‘buf‘e ‘size’ non sono validi

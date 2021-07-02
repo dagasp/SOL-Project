@@ -81,13 +81,10 @@ void threadWorker(void *arg) {
     int r;
     server_reply server_rep;
     client_operations client_op;
-    file file;
-    file.status = CLOSED;
     msg msg;
     memset(&client_op, 0, sizeof(client_op));
     memset(&server_rep, 0, sizeof(server_rep));
     memset(&msg, 0, sizeof(msg));
-    //memset(&file, 0, sizeof(file));
     if ((r = readn(connFd, (void*)&client_op, sizeof(server_rep))) < 0) {
         fprintf(stderr, "Impossibile leggere dal client\n");
         return;
@@ -116,7 +113,6 @@ void threadWorker(void *arg) {
                     icl_hash_insert(hTable, client_op.pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
-                    file.status = OPEN;
                     if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
                         perror("writen");
                         break;
@@ -142,39 +138,55 @@ void threadWorker(void *arg) {
                     }
                 } 
                 else { //File esiste
-                    file.status = OPEN;
-                    int fb = SUCCESS;
-                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
-                        perror("writen");
-                        break;
-                    }       
+                    printf("Trying to open the file...\n");
+                    int rep = open_file(hTable, (void*)client_op.pathname); //Apro il file
+                    if (rep == 0) { //Apertura file con successo, segnalo
+                        printf("File aperto nella HTABLE\n");
+                        int fb = SUCCESS;
+                        if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen");
+                            break;
+                        }      
+                    } 
                 }
                 break;
             }
-        case READFILE: 
+        case READFILE:
+        msg.data = malloc(sizeof(char)*BUFSIZE);
+        if (!msg.data) {
+            fprintf(stderr, "Errore nella malloc\n");
+            break;
+        }
         msg.data = icl_hash_find(hTable, client_op.pathname);
         if (msg.data == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep.reply_code = FAILED; //-1
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+                free(msg.data);
                 perror("writen");
                 break;
             }
+            free(msg.data);
             break;
         }
-        printf("FILE STATUS NELLA READFILE: %d\n", file.status);
-        if ((file.status == OPEN)) { //Se il file è aperto lo copio
+        if (is_file_open(hTable, client_op.pathname) == OPEN) { //Se il file è aperto lo copio
+            printf("File is open - SUCCESS\n");
             msg.size = strnlen(msg.data, BUFSIZE);
+            printf("MSG SIZE IS: %ld\n", msg.size);
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size);
-            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep)))) {
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+                free(msg.data);
                 perror("writen");
                 break;
             }
+            //free(msg.data);
         }
-        else { //file.status == CLOSED - Il file non è stato aperto, non è stato possibile leggerlo
+        else { //file_status == CLOSED - Il file non è stato aperto, non è stato possibile leggerlo
+            printf("File is closed - FAILED\n");
             server_rep.reply_code = FAILED;
-            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep)))) {
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+                free(msg.data);
                 perror("writen");
                 break;
             }
@@ -186,8 +198,10 @@ ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al ser
 memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */      int n_of_files;
-        if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0)
+        if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0) {
+            perror("readn");
             break;
+        }
         int available_files = get_n_entries(hTable);
         if (n_of_files <= 0) { //Il server deve leggere tutti i file
         int n_stored_files = available_files;
@@ -228,7 +242,10 @@ int main (int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
     //icl_entry_t *entry;
+    
+    /*Debug inserimento file server*/    
     icl_hash_insert(hTable, "pippo", "prova contenuto");
+    
     int num_of_threads_in_pool = conf->num_of_threads;
     //Maschere per i segnali 
     sigset_t mask;

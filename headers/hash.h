@@ -56,17 +56,22 @@ hash_pjw(void* key);
 int 
 string_compare(void* a, void* b);
 
+/* Funzioni aggiunte*/
 int open_file(icl_hash_t *, void * key);
 
 int is_file_open(icl_hash_t *, void *key);
 
 int get_n_entries (icl_hash_t *);
+/*Fine funzioni aggiunte*/
+
+void get_file(icl_hash_t *, void **, void **);
 
 #define icl_hash_foreach(ht, tmpint, tmpent, kp, dp)    \
     for (tmpint=0;tmpint<ht->nbuckets; tmpint++)        \
         for (tmpent=ht->buckets[tmpint];                                \
              tmpent!=NULL&&((kp=tmpent->key)!=NULL)&&((dp=tmpent->data)!=NULL); \
-             tmpent=tmpent->next)
+             tmpent=tmpent->next) \
+              
 
 
 #if defined(c_plusplus) || defined(__cplusplus)

@@ -37,6 +37,7 @@ typedef struct client_operations {
     unsigned int op_code;
     int flags;
     int feedback;
+    int files_to_read;
 } client_operations;
 
 typedef struct server_reply {

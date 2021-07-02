@@ -146,6 +146,7 @@ icl_hash_find(icl_hash_t *ht, void* key)
     return NULL;
 }
 
+
 /**
  * Insert an item into the hash table.
  *
@@ -238,6 +239,17 @@ icl_hash_update_insert(icl_hash_t *ht, void* key, void *data, void **olddata)
         *olddata = NULL;
 
     return curr;
+}
+
+void get_file(icl_hash_t *t, void **pathname, void **content) {
+    void *kp, *dp;
+    icl_entry_t *curr;
+    for (int i=0;i<t->nbuckets; i++) {
+        for (curr=t->buckets[i];curr!=NULL&&((kp=curr->key)!=NULL)&&((dp=curr->data)!=NULL);curr=curr->next) {
+           *pathname = curr->key;
+           *content = curr->data;
+        }
+    }
 }
 
 /**

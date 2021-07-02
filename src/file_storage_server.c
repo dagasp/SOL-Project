@@ -180,7 +180,7 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
-            //free(msg.data);
+            free(msg.data);
         }
         else { //file_status == CLOSED - Il file non è stato aperto, non è stato possibile leggerlo
             printf("File is closed - FAILED\n");
@@ -190,27 +190,36 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
+            free(msg.data);
         }
+        
         break;
-        case READNFILES: {
+        case READNFILES: { 
         /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
 ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al server è quella di leggere tutti i file
 memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */      int n_of_files;
-        if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0) {
+        /*if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0) {
             perror("readn");
             break;
-        }
+        }*/
+        printf("SONO NELLA READNFILES\n");
+        n_of_files = client_op.files_to_read;
         int available_files = get_n_entries(hTable);
         if (n_of_files <= 0) { //Il server deve leggere tutti i file
-        int n_stored_files = available_files;
-        if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) //Dico al client quanti file invierò
+            int n_stored_files = available_files;
+            char *pathname[n_stored_files], *content[n_stored_files];
+            if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) //Dico al client quanti file invierò
                     break;
-            while (n_stored_files > 0) {
-                //implementare funzione che legge tutti i files disponibili
-                n_stored_files--;
-            }
+                int i = 0;
+                while (n_stored_files > 0) { //implementare funzione che legge tutti i files disponibili
+                    get_file(hTable, (void*)&pathname, (void*)&content);
+                    printf("NOME FILE: %s\n", pathname[i]);
+                    printf("CONTENUTO FILE: %s\n", content[i]);
+                    n_stored_files--;
+                    i++;
+                }
         }
         if (available_files < n_of_files) {
             //deve inviare tutti i files disponibili
@@ -241,12 +250,16 @@ int main (int argc, char **argv) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
     }
-    //icl_entry_t *entry;
-    
+    //icl_entry_t *entry
     /*Debug inserimento file server*/    
     icl_hash_insert(hTable, "pippo", "prova contenuto");
-    
+    icl_hash_insert(hTable, "gianni", "contenuto incredibile");
+    icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
+    /*Fine debug*/
+    //icl_hash_dump(stdout, hTable);
+
     int num_of_threads_in_pool = conf->num_of_threads;
+    
     //Maschere per i segnali 
     sigset_t mask;
     sigemptyset(&mask);

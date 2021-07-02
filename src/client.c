@@ -64,6 +64,8 @@ void send_request () {
         }
         case 'R': {//Invio richiesta al server di lettura di N files
             //int err;
+            printf("Sono nella readNFiles\n");
+            printf("OP CODE: %c\n", opt);
             int n_files_to_read = *((int*)&n->data);
             if (readNFiles(n_files_to_read, config->directory) < 0) {
                 fprintf(stderr, "Non è stato possibile leggere i files dal server\n");

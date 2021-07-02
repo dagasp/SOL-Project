@@ -1,3 +1,6 @@
+#if !defined(_QUEUE_H)
+#define _QUEUE_H
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -19,3 +22,5 @@ void insert (fqueue *queue, unsigned int opcode, void *value);
 node *pop(fqueue *queue);
 
 void dequeue (fqueue *queue);
+
+#endif

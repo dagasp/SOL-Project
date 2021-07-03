@@ -68,13 +68,13 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     //strcpy(client_op.pathname, pathname);
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
     //Farsi mandare dal server la strlen del buffer da scrivere ---
-    SYSCALL_RETURN("readn", *size, readn(fd_skt, (void*)&server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, (void*)&server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
     if (server_rep.reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
         return -1;
     } 
     else {
-        memcpy(*buf, server_rep.data, *size);
+        memcpy(*buf, server_rep.data, strlen(server_rep.data)+1);
         *size = strlen(*buf);
     }
     return 0;
@@ -95,13 +95,46 @@ int readNFiles(int N, const char *dirname) {
     strcpy(client_op.dirname, dirname);
     int files_letti = 0;
     int n;
-    printf("Sono dentro l'API readNFiles\n");
+    //printf("Sono dentro l'API readNFiles\n");
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
-    SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); //Numero files da salvare
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
     printf("FILE DA LEGGERE: %d\n", files_letti);
     if (files_letti >= 0)
         return files_letti;
     else
         return -1;
+}
+
+/*Richiesta di scrivere in append al file ‘pathname‘ i ‘size‘ bytes contenuti nel buffer ‘buf’. L’operazione di append
+nel file è garantita essere atomica dal file server. Se ‘dirname’ è diverso da NULL, il file eventualmente spedito
+dal server perchè espulso dalla cache per far posto ai nuovi dati di ‘pathname’ dovrà essere scritto in ‘dirname’;
+Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opportunamente.
+*/
+
+int appendToFile(const char *pathname, void *buf, size_t size, const char *dirname) {
+    client_operations client_op;
+    memset(&client_op, 0, sizeof(client_op));
+    client_op.op_code = APPENDTOFILE;
+    client_op.size = size;
+    strcpy(client_op.pathname, pathname);
+    memcpy(client_op.data, buf, size);
+    int n, fb;
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
+    return fb;
+}
+
+/*Chiude la connessione AF_UNIX associata al socket file sockname. Ritorna 0 in caso di successo, -1 in caso di
+fallimento, errno viene settato opportunamente.*/
+
+int closeConnection(const char *sockname) {
+    client_operations client_op;
+    memset(&client_op, 0, sizeof(client_op));
+    client_op.op_code = CLOSECONNECTION;
+    int n, feedback;
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &feedback, sizeof(int)), "Impossibile ricevere feedback dal server\n", "");
+    SYSCALL_RETURN("close", n, close(fd_skt), "Impossibile chiudere il socket associato\n", "");
+    return 0;
 }
 

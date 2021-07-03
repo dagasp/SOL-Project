@@ -20,6 +20,7 @@
 #include "util.h"
 
 #define UNIX_PATH_MAX 108 
+#define DIR_SIZE 20
 #define O_CREATE 0
 #define O_LOCK 1
 
@@ -28,18 +29,20 @@ enum OP_CODE {
     READFILE = 1,
     READNFILES = 2,
     WRITEFILE = 3,
-    APPENDTOFILE = 4
+    APPENDTOFILE = 4,
+    CLOSECONNECTION = 5
 };
 
 typedef struct client_operations {
     char pathname[BUFSIZE];
     char data[BUFSIZE];
-    char dirname [20];
+    char dirname [DIR_SIZE];
     FILE *fp;
     unsigned int op_code;
     int flags;
     int feedback;
     int files_to_read;
+    size_t size;
 } client_operations;
 
 typedef struct server_reply {

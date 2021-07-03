@@ -146,6 +146,27 @@ icl_hash_find(icl_hash_t *ht, void* key)
     return NULL;
 }
 
+int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
+    icl_entry_t* curr;
+    unsigned int hash_val;
+
+    if(!ht || !key) return -1;
+
+    hash_val = (* ht->hash_function)(key) % ht->nbuckets;
+    char *data = calloc(sizeof(char), BUFSIZE);
+    if (!data) {
+        return -1;
+    }
+    for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if ( ht->hash_key_compare(curr->key, key)) {
+            strncpy(data, (char*)curr->data, BUFSIZE);
+            strncat(data, new_data, BUFSIZE);
+            curr->data = (void*)data;
+        }
+            
+
+    return 0;
+}
 
 /**
  * Insert an item into the hash table.
@@ -337,29 +358,32 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
  */
 
 int
-icl_hash_dump(FILE* stream, icl_hash_t* ht, char *dirname)
+icl_hash_dump(FILE* stream, icl_hash_t* ht, char *dirname, int num_of_files)
 {
     icl_entry_t *bucket, *curr;
     int i;
-
+    int file_saved = 1;
     if(!ht) return -1;
-    if (check_for_dir(dirname) != 0)
-       if (mk_directory(dirname) != 0) {
+    if (check_for_dir(dirname) != 0) //Controllo che la cartella esista
+       if (mk_directory(dirname) != 0) { //Cartella non esiste-> la creo
             fprintf(stderr, "Impossibile creare la cartella %s\n", dirname);
             return -1;
        }
     char *tmp_dirname = malloc(sizeof(char)*20);
-    memcpy(tmp_dirname, dirname, strlen(dirname)+1);
+    memcpy(tmp_dirname, dirname, strlen(dirname)+1); //Salvo il nome della cartella
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {
             if(curr->key) {
+                if (file_saved > num_of_files) return 0; //Se ho salvato il num_of_files richiesto mi fermo
                 memcpy(dirname, tmp_dirname, strlen(tmp_dirname)+1);
                 if ((stream = fopen(strncat(dirname, curr->key, 20), "w")) == NULL) {
                     fprintf(stderr, "Errore nell'apertura del file\n");
                     return -1;
                 }
-                fprintf(stream, "%s\n", (char*)curr->data);
+                fprintf(stream, "%s", (char*)curr->data);
+                printf("File saved: %d\n", file_saved);
+                file_saved++;
             }
             if (fclose(stream) != 0) {
                 fprintf(stderr, "Errore nella chiusura del file\n");
@@ -369,6 +393,26 @@ icl_hash_dump(FILE* stream, icl_hash_t* ht, char *dirname)
         }
     }
     free(tmp_dirname);
+    return 0;
+}
+
+int
+icl_hash_dump_2(FILE* stream, icl_hash_t* ht)
+{
+    icl_entry_t *bucket, *curr;
+    int i;
+
+    if(!ht) return -1;
+
+    for(i=0; i<ht->nbuckets; i++) {
+        bucket = ht->buckets[i];
+        for(curr=bucket; curr!=NULL; ) {
+            if(curr->key)
+                fprintf(stream, "icl_hash_dump: %s: %s\n", (char *)curr->key, (char*)curr->data);
+            curr=curr->next;
+        }
+    }
+
     return 0;
 }
 

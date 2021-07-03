@@ -87,7 +87,7 @@ int main(int argc, char **argv) {
         }
     int opt;
     //Da implementare: -h, -f, -r, -R, -t, -p
-    while ((opt = getopt(argc, argv, "hf:w:W:D:r:R:d:t:l:u:c:p")) != -1) { 
+    while ((opt = getopt(argc, argv, "hf:w:W:D:r:R:d:t:l:u:c:p")) != -1) {
         switch(opt) {
             case 'h': {
                 print_usage(argv[0]);
@@ -129,7 +129,17 @@ int main(int argc, char **argv) {
     openConnection(config->sock_name, 1000, time);
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request();
-        //queue->head = queue->head->next;
+        char *append = "Incredibile prova di append, fantastica";
+        if (appendToFile("pippo", (void*)append, 40, "boh") == 0) {
+            printf("Agg appis\n");
+        }
+        else
+            printf("Impossibile appendere\n");
     }
+    if (closeConnection(config->sock_name) == 0)
+        printf("Connessione chiusa\n");
+    else 
+        printf("Impossibile chiudere la connessione\n");
+    free(queue);
     return 0;
 }

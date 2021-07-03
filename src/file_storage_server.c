@@ -32,6 +32,8 @@ static config_file *conf;
 //static wargs *w_args;
 static icl_hash_t *hTable;
 
+fd_set set, tmpset;
+
 void initialize_table () {
     hTable = icl_hash_create(20, NULL, NULL);
 }
@@ -191,9 +193,8 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
-            //free(msg.data);
+            free(msg.data);
         }
-        
         break;
         case READNFILES: { 
         /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
@@ -201,17 +202,13 @@ ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al ser
 memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */      int n_of_files;
-        /*if ((r = readn(connFd, &n_of_files, sizeof(int))) < 0) {
-            perror("readn");
-            break;
-        }*/
+        FILE *fp = NULL;
         printf("SONO NELLA READNFILES\n");
         n_of_files = client_op.files_to_read;
         int available_files = get_n_entries(hTable);
         if (n_of_files <= 0 || available_files < n_of_files) { //Il server deve leggere tutti i file disponibili
             int n_stored_files = available_files;
-                    FILE *fp = NULL;
-                    if (icl_hash_dump(fp, hTable, client_op.dirname) == 0) { //File copiati correttamente
+                    if (icl_hash_dump(fp, hTable, client_op.dirname, available_files) == 0) { //File copiati correttamente - Magari farsi tornare # file scritti dalla funzione?
                         if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) { //Dico al client quanti file ho inviato
                             perror("writen");
                             break;
@@ -219,17 +216,48 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
                     }
         }
         else { //deve inviare N files
-
+            if (icl_hash_dump(fp, hTable, client_op.dirname, client_op.files_to_read) == 0) { //File copiati correttamente - Magari farsi tornare # file scritti dalla funzione?
+                        if ((r = writen(connFd, &client_op.files_to_read, sizeof(int))) < 0) { //Dico al client quanti file ho inviato
+                            perror("writen");
+                            break;
+                        }     
+                    }
         }        
         }
         case WRITEFILE:
             break;
         case APPENDTOFILE:
+       // icl_hash_dump_2(stdout, hTable);
+            if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
+                printf("HO APPESO\n");
+                icl_hash_dump_2(stdout, hTable);
+                int fb = SUCCESS;
+                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen");
+                            break;
+                        }  
+            }
+            else {
+                int fb = FAILED;
+                printf("NON HO APPESO\n");
+                //icl_hash_dump_2(stdout, hTable);
+                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen");
+                            break;
+                        }  
+            }
+            break;
+        case CLOSECONNECTION:
+            FD_CLR(connFd, &set);
+            int fb = SUCCESS;
+            if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                perror("write");
+                break;
+            }
             break;
         default:
             break;
     }
-
     //Scrivo sulla pipe di comunicazione col main thread il descrittore per segnalare che il worker ha finito
     if (writen(req_pipe, &connFd, sizeof(long)) == -1) {
 		perror("write pipe");
@@ -331,7 +359,6 @@ int main (int argc, char **argv) {
 		goto _exit;
     }
     
-    fd_set set, tmpset;
     FD_ZERO(&set);
     FD_ZERO(&tmpset);
 
@@ -410,7 +437,7 @@ int main (int argc, char **argv) {
     }
     
     destroyThreadPool(pool, 0);  // notifico che i thread dovranno uscire
-
+    icl_hash_destroy(hTable, free, free);
     // aspetto la terminazione de signal handler thread
     pthread_join(sighandler_thread, NULL);
 

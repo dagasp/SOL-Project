@@ -40,12 +40,14 @@ void
 
 icl_entry_t
 * icl_hash_insert(icl_hash_t *, void*, void *),
-    * icl_hash_update_insert(icl_hash_t *, void*, void *, void **);
+    * icl_hash_update_insert(icl_hash_t *, void*, void *, void**);
 
 int
 icl_hash_destroy(icl_hash_t *, void (*)(void*), void (*)(void*)),
-    icl_hash_dump(FILE *, icl_hash_t *, char *);
+    icl_hash_dump(FILE *, icl_hash_t *, char *, int num);
 
+int
+icl_hash_dump_2(FILE* stream, icl_hash_t* ht);
 int icl_hash_delete( icl_hash_t *ht, void* key, void (*free_key)(void*), void (*free_data)(void*) );
 
 /* simple hash function */
@@ -62,6 +64,9 @@ int open_file(icl_hash_t *, void * key);
 int is_file_open(icl_hash_t *, void *key);
 
 int get_n_entries (icl_hash_t *);
+
+int append (icl_hash_t *ht, void *key, char *new_data, size_t size);
+
 /*Fine funzioni aggiunte*/
 
 //void get_file(icl_hash_t *t, char pathname[][], char content[][]);

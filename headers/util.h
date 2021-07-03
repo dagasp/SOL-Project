@@ -186,7 +186,11 @@ static inline int TRYLOCK(pthread_mutex_t* l) {
 
 /*Legge dal file config.txt i dati*/
 
-config_file *read_config(char *config); // da implementare
+config_file *read_config(char *config); 
+
+int check_for_dir (char *directory);
+
+int mk_directory (char *directory);
 
 /** Evita letture parziali
  *

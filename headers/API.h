@@ -34,6 +34,8 @@ enum OP_CODE {
 typedef struct client_operations {
     char pathname[BUFSIZE];
     char data[BUFSIZE];
+    char dirname [20];
+    FILE *fp;
     unsigned int op_code;
     int flags;
     int feedback;

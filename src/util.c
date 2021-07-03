@@ -69,3 +69,15 @@ config_file *read_config(char *config) {
     free(buf);
     return conf;
 }
+
+
+int check_for_dir (char *directory) {
+    struct stat st = {0};
+    if (stat(directory, &st) == -1)
+        return -1;
+    return 0;
+}
+
+int mk_directory (char *directory) {
+    return mkdir(directory, 0777);
+}

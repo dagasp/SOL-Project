@@ -241,17 +241,19 @@ icl_hash_update_insert(icl_hash_t *ht, void* key, void *data, void **olddata)
     return curr;
 }
 
-void get_file(icl_hash_t *t, void **pathname, void **content) {
+/*
+void get_file(icl_hash_t *t, char pathname[r][c], char content[r][c]) {
     void *kp, *dp;
     icl_entry_t *curr;
     for (int i=0;i<t->nbuckets; i++) {
         for (curr=t->buckets[i];curr!=NULL&&((kp=curr->key)!=NULL)&&((dp=curr->data)!=NULL);curr=curr->next) {
-           *pathname = curr->key;
-           *content = curr->data;
+           //printf("PATHNAME: %s\n", (char*)curr->key);
+           //printf("CONTENT: %s\n", (char*)curr->data);
+           strcpy(pathname[i], (char*)curr->key);
         }
     }
 }
-
+*/
 /**
  * Free one hash table entry located by key (key and data are freed using functions).
  *
@@ -327,29 +329,46 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
 /**
  * Dump the hash table's contents to the given file pointer.
  *
- * @param stream -- the file to which the hash table should be dumped
+ * @param stream -- the files to which the hash table should be dumped
  * @param ht -- the hash table to be dumped
+ * @param dirname -- the directory where to save the files 
  *
  * @returns 0 on success, -1 on failure.
  */
 
 int
-icl_hash_dump(FILE* stream, icl_hash_t* ht)
+icl_hash_dump(FILE* stream, icl_hash_t* ht, char *dirname)
 {
     icl_entry_t *bucket, *curr;
     int i;
 
     if(!ht) return -1;
-
+    if (check_for_dir(dirname) != 0)
+       if (mk_directory(dirname) != 0) {
+            fprintf(stderr, "Impossibile creare la cartella %s\n", dirname);
+            return -1;
+       }
+    char *tmp_dirname = malloc(sizeof(char)*20);
+    memcpy(tmp_dirname, dirname, strlen(dirname)+1);
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {
-            if(curr->key)
-                fprintf(stream, "icl_hash_dump: %s: %p\n", (char *)curr->key, curr->data);
+            if(curr->key) {
+                memcpy(dirname, tmp_dirname, strlen(tmp_dirname)+1);
+                if ((stream = fopen(strncat(dirname, curr->key, 20), "w")) == NULL) {
+                    fprintf(stderr, "Errore nell'apertura del file\n");
+                    return -1;
+                }
+                fprintf(stream, "%s\n", (char*)curr->data);
+            }
+            if (fclose(stream) != 0) {
+                fprintf(stderr, "Errore nella chiusura del file\n");
+                return -1;
+            }
             curr=curr->next;
         }
     }
-
+    free(tmp_dirname);
     return 0;
 }
 

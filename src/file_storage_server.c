@@ -85,7 +85,7 @@ void threadWorker(void *arg) {
     memset(&client_op, 0, sizeof(client_op));
     memset(&server_rep, 0, sizeof(server_rep));
     memset(&msg, 0, sizeof(msg));
-    if ((r = readn(connFd, (void*)&client_op, sizeof(server_rep))) < 0) {
+    if ((r = readn(connFd, (void*)&client_op, sizeof(client_op))) < 0) {
         fprintf(stderr, "Impossibile leggere dal client\n");
         return;
     }
@@ -152,6 +152,7 @@ void threadWorker(void *arg) {
                 break;
             }
         case READFILE:
+        printf("Sono nella readfile\n");
         msg.data = malloc(sizeof(char)*BUFSIZE);
         if (!msg.data) {
             fprintf(stderr, "Errore nella malloc\n");
@@ -166,7 +167,7 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
-            free(msg.data);
+            //free(msg.data);
             break;
         }
         if (is_file_open(hTable, client_op.pathname) == OPEN) { //Se il file è aperto lo copio
@@ -180,7 +181,7 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
-            free(msg.data);
+            //free(msg.data);
         }
         else { //file_status == CLOSED - Il file non è stato aperto, non è stato possibile leggerlo
             printf("File is closed - FAILED\n");
@@ -190,7 +191,7 @@ void threadWorker(void *arg) {
                 perror("writen");
                 break;
             }
-            free(msg.data);
+            //free(msg.data);
         }
         
         break;
@@ -207,24 +208,19 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
         printf("SONO NELLA READNFILES\n");
         n_of_files = client_op.files_to_read;
         int available_files = get_n_entries(hTable);
-        if (n_of_files <= 0) { //Il server deve leggere tutti i file
+        if (n_of_files <= 0 || available_files < n_of_files) { //Il server deve leggere tutti i file disponibili
             int n_stored_files = available_files;
-            char *pathname[n_stored_files], *content[n_stored_files];
-            if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) //Dico al client quanti file invierò
-                    break;
-                int i = 0;
-                while (n_stored_files > 0) { //implementare funzione che legge tutti i files disponibili
-                    get_file(hTable, (void*)&pathname, (void*)&content);
-                    printf("NOME FILE: %s\n", pathname[i]);
-                    printf("CONTENUTO FILE: %s\n", content[i]);
-                    n_stored_files--;
-                    i++;
-                }
+                    FILE *fp = NULL;
+                    if (icl_hash_dump(fp, hTable, client_op.dirname) == 0) { //File copiati correttamente
+                        if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) { //Dico al client quanti file ho inviato
+                            perror("writen");
+                            break;
+                        }     
+                    }
         }
-        if (available_files < n_of_files) {
-            //deve inviare tutti i files disponibili
-        } 
-        //deve inviare N files
+        else { //deve inviare N files
+
+        }        
         }
         case WRITEFILE:
             break;
@@ -348,8 +344,8 @@ int main (int argc, char **argv) {
 
     volatile long termina=0;
     while(!termina) {
+        tmpset = set;
 	// copio il set nella variabile temporanea per la select
-	tmpset = set;
 	if (select(fdmax+1, &tmpset, NULL, NULL, NULL) == -1) {
 	    perror("select");
 	    goto _exit;

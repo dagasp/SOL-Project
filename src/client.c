@@ -54,10 +54,11 @@ void send_request () {
                 fprintf(stderr, "Errore nella malloc\n");
                 break;
             }
+           
             if  ((err_code = readFile((char*)n->data, (void**) (&msg.data),&size) == 0)) {
                  printf("Letti %ld bytes\n", size);
             }
-            printf("FILE RICEVUTO: %s\n", (char*)msg.data);
+            printf("FILE RICEVUTO: %s\n", msg.data);
             //da implementare stampa;
             free(msg.data);
             break;

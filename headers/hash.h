@@ -44,7 +44,7 @@ icl_entry_t
 
 int
 icl_hash_destroy(icl_hash_t *, void (*)(void*), void (*)(void*)),
-    icl_hash_dump(FILE *, icl_hash_t *);
+    icl_hash_dump(FILE *, icl_hash_t *, char *);
 
 int icl_hash_delete( icl_hash_t *ht, void* key, void (*free_key)(void*), void (*free_data)(void*) );
 
@@ -64,7 +64,7 @@ int is_file_open(icl_hash_t *, void *key);
 int get_n_entries (icl_hash_t *);
 /*Fine funzioni aggiunte*/
 
-void get_file(icl_hash_t *, void **, void **);
+//void get_file(icl_hash_t *t, char pathname[][], char content[][]);
 
 #define icl_hash_foreach(ht, tmpint, tmpent, kp, dp)    \
     for (tmpint=0;tmpint<ht->nbuckets; tmpint++)        \

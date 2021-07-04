@@ -47,13 +47,16 @@ config_file *read_config(char *config) {
                 conf->memory_space = atoi(buf);
                 break;
             case 2:
+                conf->num_of_files = atoi(buf);
+                break;
+            case 3:
                 /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
                 }*/
                 strncpy(conf->sock_name, buf, BUFSIZE);
                 break;
-            case 3:
+            case 4:
                 /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'directory' non è una stringa!\n");
                     return NULL;

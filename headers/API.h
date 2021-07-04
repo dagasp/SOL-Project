@@ -30,7 +30,8 @@ enum OP_CODE {
     READNFILES = 2,
     WRITEFILE = 3,
     APPENDTOFILE = 4,
-    CLOSECONNECTION = 5
+    CLOSEFILE = 5,
+    CLOSECONNECTION = 6
 };
 
 typedef struct client_operations {

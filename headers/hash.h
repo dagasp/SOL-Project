@@ -21,19 +21,23 @@ typedef struct icl_entry_s {
     void* key;
     void *data;
     int status; //-1 NO, 0 SI
+    int modified; //File modificato - 0-> SI, 1 -> NO
     struct icl_entry_s* next;
 } icl_entry_t;
 
 typedef struct icl_hash_s {
     int nbuckets;
     int nentries;
+    int max_size;
+    int curr_size;
+    int max_files;
     icl_entry_t **buckets;
     unsigned int (*hash_function)(void*);
     int (*hash_key_compare)(void*, void*);
 } icl_hash_t;
 
 icl_hash_t *
-icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*) );
+icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*));
 
 void
 * icl_hash_find(icl_hash_t *, void* key);
@@ -60,6 +64,8 @@ string_compare(void* a, void* b);
 
 /* Funzioni aggiunte*/
 int open_file(icl_hash_t *, void * key);
+
+int close_file(icl_hash_t *, void *key);
 
 int is_file_open(icl_hash_t *, void *key);
 

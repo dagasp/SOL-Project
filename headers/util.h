@@ -34,10 +34,15 @@
 #define MAXBACKLOG   32
 #endif
 
+#if !defined (MB)
+#define MB 1024*1024 //1MB
+#endif
+
 /*Header contenente funzioni utilità e strutture dati d'appoggio*/
 typedef struct config_file {
     long memory_space;
     unsigned int num_of_threads;
+    unsigned int num_of_files;
     char sock_name[BUFSIZE];
     char directory[BUFSIZE];
 } config_file;

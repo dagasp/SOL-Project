@@ -227,10 +227,10 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
        // icl_hash_dump_2(stdout, hTable);
             if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
                 printf("HO APPESO\n");
-                icl_hash_dump_2(stdout, hTable);
+                //icl_hash_dump_2(stdout, hTable);
                 int fb = SUCCESS;
                 if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
-                            perror("writen");
+                            perror("writen positive feedback append");
                             break;
                         }  
             }
@@ -239,19 +239,34 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
                 printf("NON HO APPESO\n");
                 //icl_hash_dump_2(stdout, hTable);
                 if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
-                            perror("writen");
+                            perror("writen negative feedback append");
                             break;
-                        }  
+                }  
             }
             break;
-        case CLOSECONNECTION:
-            FD_CLR(connFd, &set);
+        case CLOSEFILE:
+            if (close_file(hTable, client_op.pathname) == 0) { //File chiuso correttamente 
+                int fb = SUCCESS;
+                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen positive feedback closeFile");
+                            break;
+                }
+                else { //Non sono riuscito a chiudere il file
+                    int fb = FAILED;
+                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen negative feedback closeFile");
+                            break;
+                    } 
+                } 
+            }
+        /*case CLOSECONNECTION: ;
+           // FD_CLR(connFd, &set);
             int fb = SUCCESS;
             if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
-                perror("write");
+                perror("write positive feedback closeConnection");
                 break;
             }
-            break;
+            break;*/
         default:
             break;
     }
@@ -263,7 +278,7 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
 }
 
 void destroy_everything(int force) {
-    icl_hash_destroy(hTable, free, free);
+    icl_hash_destroy(hTable, NULL, free);
     destroyThreadPool(pool, force);  // notifico che i thread dovranno uscire
     unlink(conf->sock_name);
     free(conf);
@@ -279,9 +294,9 @@ int main (int argc, char **argv) {
     //icl_entry_t *entry
     
     /*Debug inserimento file server*/    
-   // icl_hash_insert(hTable, "pippo", "prova contenuto");
-    //icl_hash_insert(hTable, "gianni", "contenuto incredibile");
-    //icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
+    icl_hash_insert(hTable, "pippo", "prova contenuto");
+    icl_hash_insert(hTable, "gianni", "contenuto incredibile");
+    icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
     /*Fine debug*/
     //icl_hash_dump(stdout, hTable);
 
@@ -436,10 +451,11 @@ int main (int argc, char **argv) {
 	    }
 	}
     }
-    destroy_everything(0); //Uscirà e libererà la memoria aspettando che tutti i thread finiscano
+    destroy_everything(0); //libererà la memoria aspettando che tutti i thread finiscano
     pthread_join(sighandler_thread, NULL);
     return 0;    
  _exit:
-    destroy_everything(1); //Uscirà e libererà la memoria forzando la chiusura di tutti i thread
+    destroy_everything(1); //libererà la memoria forzando la chiusura di tutti i thread
+    pthread_join(sighandler_thread, NULL); 
     return -1;
 }

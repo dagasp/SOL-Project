@@ -76,6 +76,18 @@ int open_file(icl_hash_t *t, void *key) {
     return -1; //Couldn't open the file for some reason 
 }
 
+int close_file(icl_hash_t *t, void *key) {
+     icl_entry_t* curr;
+    unsigned int hash_val;
+    hash_val = (*t->hash_function)(key) % t->nbuckets;
+    for (curr=t->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if ( t->hash_key_compare(curr->key, key)) { //File found, it will be close
+            curr->status = CLOSED;
+            return 0; //File closed - Success
+        }
+    return -1; //Couldn't close the file for some reason 
+}
+
 int is_file_open(icl_hash_t *t, void *key) {
     icl_entry_t* curr;
     unsigned int hash_val;
@@ -97,7 +109,7 @@ int is_file_open(icl_hash_t *t, void *key) {
  */
 
 icl_hash_t *
-icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*) )
+icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*))
 {
     icl_hash_t *ht;
     int i;
@@ -112,7 +124,8 @@ icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_
     ht->nbuckets = nbuckets;
     for(i=0;i<ht->nbuckets;i++)
         ht->buckets[i] = NULL;
-
+    //ht->max_size = memory_size;
+    //ht->max_files = max_files;
     ht->hash_function = hash_function ? hash_function : hash_pjw;
     ht->hash_key_compare = hash_key_compare ? hash_key_compare : string_compare;
 
@@ -162,9 +175,8 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
             strncpy(data, (char*)curr->data, BUFSIZE);
             strncat(data, new_data, BUFSIZE);
             curr->data = (void*)data;
+            curr->modified = 0; //Ho modificato -- serve per sapere dove liberare memoria alla fine
         }
-            
-
     return 0;
 }
 
@@ -201,8 +213,8 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     curr->key = key;
     curr->data = data;
     curr->status = OPEN;
+    curr->modified = 1;
     curr->next = ht->buckets[hash_val]; /* add at start */
-
     ht->buckets[hash_val] = curr;
     ht->nentries++;
 
@@ -335,7 +347,10 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
         for (curr=bucket; curr!=NULL; ) {
             next=curr->next;
             if (*free_key && curr->key) (*free_key)(curr->key);
-            if (*free_data && curr->data) (*free_data)(curr->data);
+            if (*free_data && curr->data) {
+                if (curr->modified == 0) //Se ho fatto l'append al file libero la memoria
+                    (*free_data)(curr->data);
+            }
             free(curr);
             curr=next;
         }

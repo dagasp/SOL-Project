@@ -9,8 +9,8 @@
 #include <pthread.h>
 #include <unistd.h>
 #include <errno.h>
-#include <util.h>
-#include <threadpool.h>
+#include "util.h"
+#include "threadpool.h"
 
 /**
  * @function void *threadpool_thread(void *threadpool)

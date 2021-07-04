@@ -96,7 +96,7 @@ int readNFiles(int N, const char *dirname) {
     int files_letti = 0;
     int n;
     //printf("Sono dentro l'API readNFiles\n");
-    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
     printf("FILE DA LEGGERE: %d\n", files_letti);
     if (files_letti >= 0)
@@ -119,7 +119,21 @@ int appendToFile(const char *pathname, void *buf, size_t size, const char *dirna
     strcpy(client_op.pathname, pathname);
     memcpy(client_op.data, buf, size);
     int n, fb;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta di append al server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
+    return fb;
+}
+
+/*Richiesta di chiusura del file puntato da ‘pathname’. Eventuali operazioni sul file dopo la closeFile falliscono.
+Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opportunamente.
+*/
+int closeFile(const char *pathname) {
+    client_operations client_op;
+    memset(&client_op, 0, sizeof(client_op));
+    client_op.op_code = CLOSEFILE;
+    strcpy(client_op.pathname, pathname);
+    int n, fb;
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta di chiusura del file al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
     return fb;
 }
@@ -128,12 +142,12 @@ int appendToFile(const char *pathname, void *buf, size_t size, const char *dirna
 fallimento, errno viene settato opportunamente.*/
 
 int closeConnection(const char *sockname) {
-    client_operations client_op;
-    memset(&client_op, 0, sizeof(client_op));
-    client_op.op_code = CLOSECONNECTION;
-    int n, feedback;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
-    SYSCALL_RETURN("readn", n, readn(fd_skt, &feedback, sizeof(int)), "Impossibile ricevere feedback dal server\n", "");
+    //client_operations client_op;
+    //memset(&client_op, 0, sizeof(client_op));
+    //client_op.op_code = CLOSECONNECTION;
+    int n;
+    //SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
+    //SYSCALL_RETURN("readn", n, readn(fd_skt, &feedback, sizeof(int)), "Impossibile ricevere feedback dal server\n", "");
     SYSCALL_RETURN("close", n, close(fd_skt), "Impossibile chiudere il socket associato\n", "");
     return 0;
 }

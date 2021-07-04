@@ -41,6 +41,7 @@ void send_request () {
             size_t size;
             if ((err_code = openFile((char*)n->data, 3) != 0)) { //Prova openFile senza specificare flags
                 printf("Impossibile aprire il file\n");
+                free(n);
                 break;
             }
             /*if ((err_code = openFile((char*)n->data, 0) != 0)) {
@@ -70,6 +71,7 @@ void send_request () {
             int n_files_to_read = *((int*)&n->data);
             if (readNFiles(n_files_to_read, config->directory) < 0) {
                 fprintf(stderr, "Non è stato possibile leggere i files dal server\n");
+                free(n);
             }
             break;
         }
@@ -123,23 +125,25 @@ int main(int argc, char **argv) {
         exit(EXIT_FAILURE);
     } //Lettura parametri dal file config
     //--- Connetto al socket --- 
+    //printf("%s\n", config->sock_name);
     struct timespec time;
     clock_gettime(CLOCK_REALTIME, &time);
     time.tv_sec += 5;
     openConnection(config->sock_name, 1000, time);
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request();
-        char *append = "Incredibile prova di append, fantastica";
-        if (appendToFile("pippo", (void*)append, 40, "boh") == 0) {
+        //char *append = "Incredibile prova di append, fantastica";
+        /*if (appendToFile("pippo", (void*)append, 40, "boh") == 0) {
             printf("Agg appis\n");
         }
         else
             printf("Impossibile appendere\n");
-    }
+    */}
     if (closeConnection(config->sock_name) == 0)
         printf("Connessione chiusa\n");
     else 
         printf("Impossibile chiudere la connessione\n");
+    free(config);
     free(queue);
     return 0;
 }

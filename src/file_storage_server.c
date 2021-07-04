@@ -30,13 +30,10 @@ typedef struct {
 
 static config_file *conf;
 //static wargs *w_args;
-static icl_hash_t *hTable;
-
+static icl_hash_t *hTable = NULL;
+threadpool_t *pool = NULL;
 fd_set set, tmpset;
 
-void initialize_table () {
-    hTable = icl_hash_create(20, NULL, NULL);
-}
 
 
 // funzione eseguita dal signal handler thread
@@ -155,17 +152,17 @@ void threadWorker(void *arg) {
             }
         case READFILE:
         printf("Sono nella readfile\n");
-        msg.data = malloc(sizeof(char)*BUFSIZE);
-        if (!msg.data) {
+       // msg.data = malloc(sizeof(char)*BUFSIZE);
+        /*if (!msg.data) {
             fprintf(stderr, "Errore nella malloc\n");
             break;
-        }
+        }*/
         msg.data = icl_hash_find(hTable, client_op.pathname);
         if (msg.data == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep.reply_code = FAILED; //-1
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-                free(msg.data);
+               // free(msg.data);
                 perror("writen");
                 break;
             }
@@ -179,7 +176,7 @@ void threadWorker(void *arg) {
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size);
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-                free(msg.data);
+                //free(msg.data);
                 perror("writen");
                 break;
             }
@@ -189,11 +186,11 @@ void threadWorker(void *arg) {
             printf("File is closed - FAILED\n");
             server_rep.reply_code = FAILED;
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-                free(msg.data);
+                //free(msg.data);
                 perror("writen");
                 break;
             }
-            free(msg.data);
+            //free(msg.data);
         }
         break;
         case READNFILES: { 
@@ -265,20 +262,26 @@ effettivamente letti), -1 in caso di fallimento, errno viene settato opportuname
 	}
 }
 
-
+void destroy_everything(int force) {
+    icl_hash_destroy(hTable, free, free);
+    destroyThreadPool(pool, force);  // notifico che i thread dovranno uscire
+    unlink(conf->sock_name);
+    free(conf);
+}
 
 
 int main (int argc, char **argv) {
-    initialize_table();
     if ((conf = read_config("../test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
     }
+    hTable = icl_hash_create(20, NULL, NULL);
     //icl_entry_t *entry
+    
     /*Debug inserimento file server*/    
-    icl_hash_insert(hTable, "pippo", "prova contenuto");
-    icl_hash_insert(hTable, "gianni", "contenuto incredibile");
-    icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
+   // icl_hash_insert(hTable, "pippo", "prova contenuto");
+    //icl_hash_insert(hTable, "gianni", "contenuto incredibile");
+    //icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
     /*Fine debug*/
     //icl_hash_dump(stdout, hTable);
 
@@ -350,8 +353,6 @@ int main (int argc, char **argv) {
 	perror("listen");
 	goto _exit;
     }
-
-    threadpool_t *pool = NULL;
 
     pool   = createThreadPool(num_of_threads_in_pool, num_of_threads_in_pool); 
     if (!pool) {
@@ -435,15 +436,10 @@ int main (int argc, char **argv) {
 	    }
 	}
     }
-    
-    destroyThreadPool(pool, 0);  // notifico che i thread dovranno uscire
-    icl_hash_destroy(hTable, free, free);
-    // aspetto la terminazione de signal handler thread
+    destroy_everything(0); //Uscirà e libererà la memoria aspettando che tutti i thread finiscano
     pthread_join(sighandler_thread, NULL);
-
-    unlink(conf->sock_name);    
     return 0;    
  _exit:
-    unlink(conf->sock_name);
+    destroy_everything(1); //Uscirà e libererà la memoria forzando la chiusura di tutti i thread
     return -1;
 }

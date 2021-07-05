@@ -12,6 +12,7 @@
 
 #include <stdio.h>
 #include "util.h"
+#include "api.h"
 
 #if defined(c_plusplus) || defined(__cplusplus)
 extern "C" {
@@ -48,7 +49,7 @@ icl_entry_t
 
 int
 icl_hash_destroy(icl_hash_t *, void (*)(void*), void (*)(void*)),
-    icl_hash_dump(FILE *, icl_hash_t *, char *, int num);
+    icl_hash_dump(long, icl_hash_t *ht, int);
 
 int
 icl_hash_dump_2(FILE* stream, icl_hash_t* ht);

@@ -74,13 +74,18 @@ config_file *read_config(char *config) {
 }
 
 
-int check_for_dir (char *directory) {
-    struct stat st = {0};
-    if (stat(directory, &st) == -1)
-        return -1;
+int check_for_dir (const char *directory) {
+    DIR *dir = opendir(directory);
+    if (!dir) return -1;
     return 0;
 }
 
-int mk_directory (char *directory) {
-    return mkdir(directory, 0777);
+int mk_directory (const char *directory) {
+    if (check_for_dir(directory) != 0)
+        return mkdir(directory, 0777);
+    else return -1;
+}
+
+char *get_path(const char *path) {
+    return realpath(path, NULL);
 }

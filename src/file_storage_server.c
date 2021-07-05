@@ -30,8 +30,13 @@ typedef struct {
 
 static config_file *conf;
 //static wargs *w_args;
-static icl_hash_t *hTable = NULL;
+
+//Hash table dei file e la sua mutex
+static icl_hash_t *hTable = NULL; 
+pthread_mutex_t files = PTHREAD_MUTEX_INITIALIZER;
+
 threadpool_t *pool = NULL;
+
 fd_set set, tmpset;
 
 
@@ -194,31 +199,30 @@ void threadWorker(void *arg) {
         }
         break;
         case READNFILES: { 
-        /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
-ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al server è quella di leggere tutti i file
-memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
-effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
-*/      int n_of_files;
-        FILE *fp = NULL;
+        int n_of_files;
         printf("SONO NELLA READNFILES\n");
         n_of_files = client_op.files_to_read;
         int available_files = get_n_entries(hTable);
         if (n_of_files <= 0 || available_files < n_of_files) { //Il server deve leggere tutti i file disponibili
-            int n_stored_files = available_files;
-                    if (icl_hash_dump(fp, hTable, client_op.dirname, available_files) == 0) { //File copiati correttamente - Magari farsi tornare # file scritti dalla funzione?
-                        if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) { //Dico al client quanti file ho inviato
-                            perror("writen");
-                            break;
-                        }     
-                    }
+            int n_stored_files = available_files; 
+            if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) { //Dico al client quanti file invierò
+                    perror("writen");
+                    break;     
+            }
+            if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //Operazione andata a buon fine, invio feedback positivo
+                printf("OK\n");
+            }
+            else printf("NOT OK \n");
         }
         else { //deve inviare N files
-            if (icl_hash_dump(fp, hTable, client_op.dirname, client_op.files_to_read) == 0) { //File copiati correttamente - Magari farsi tornare # file scritti dalla funzione?
-                        if ((r = writen(connFd, &client_op.files_to_read, sizeof(int))) < 0) { //Dico al client quanti file ho inviato
-                            perror("writen");
-                            break;
-                        }     
-                    }
+        if ((r = writen(connFd, &n_of_files, sizeof(int))) < 0) { //Dico al client quanti file invierò
+                    perror("writen");
+                    break;     
+            }
+            if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //File letti correttamente
+                printf("ok");  
+            }
+            else printf("NOT OK \n");
         }        
         }
         case WRITEFILE:
@@ -294,9 +298,9 @@ int main (int argc, char **argv) {
     //icl_entry_t *entry
     
     /*Debug inserimento file server*/    
-    icl_hash_insert(hTable, "pippo", "prova contenuto");
-    icl_hash_insert(hTable, "gianni", "contenuto incredibile");
-    icl_hash_insert(hTable, "minnie", "questo è un contenuto fantastico");
+    icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/pippo", "prova contenuto");
+    icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/gianni", "contenuto incredibile");
+    icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnie", "questo è un contenuto fantastico");
     /*Fine debug*/
     //icl_hash_dump(stdout, hTable);
 

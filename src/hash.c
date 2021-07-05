@@ -159,6 +159,22 @@ icl_hash_find(icl_hash_t *ht, void* key)
     return NULL;
 }
 
+/*void *get_random_key(icl_hash_t *ht, int index, ) {
+    icl_entry_t* curr, *bucket;
+    unsigned int hash_val;
+    int i;
+    if(!ht) return NULL;
+
+    for(i=0; i<ht->nbuckets; i++) {
+        bucket = ht->buckets[i];
+        for(curr=bucket; curr!=NULL; ) {
+            if(curr->key)
+                return curr->key;
+            curr=curr->next;
+        }
+    }
+}
+*/
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     icl_entry_t* curr;
     unsigned int hash_val;
@@ -363,51 +379,41 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
 }
 
 /**
- * Dump the hash table's contents to the given file pointer.
+ * Dump the hash table's contents to the given socket descriptor.
  *
- * @param stream -- the files to which the hash table should be dumped
+ * @param connFd -- the socket descriptor
  * @param ht -- the hash table to be dumped
- * @param dirname -- the directory where to save the files 
+ * @param n_of_files -- the number of files to read 
  *
  * @returns 0 on success, -1 on failure.
  */
 
 int
-icl_hash_dump(FILE* stream, icl_hash_t* ht, char *dirname, int num_of_files)
+icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
 {
     icl_entry_t *bucket, *curr;
     int i;
-    int file_saved = 1;
+    server_reply server_rep;
+    memset(&server_rep, 0, sizeof(server_rep));
     if(!ht) return -1;
-    if (check_for_dir(dirname) != 0) //Controllo che la cartella esista
-       if (mk_directory(dirname) != 0) { //Cartella non esiste-> la creo
-            fprintf(stderr, "Impossibile creare la cartella %s\n", dirname);
-            return -1;
-       }
-    char *tmp_dirname = malloc(sizeof(char)*20);
-    memcpy(tmp_dirname, dirname, strlen(dirname)+1); //Salvo il nome della cartella
+    int file_readed = 0;
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {
-            if(curr->key) {
-                if (file_saved > num_of_files) return 0; //Se ho salvato il num_of_files richiesto mi fermo
-                memcpy(dirname, tmp_dirname, strlen(tmp_dirname)+1);
-                if ((stream = fopen(strncat(dirname, curr->key, 20), "w")) == NULL) {
-                    fprintf(stderr, "Errore nell'apertura del file\n");
+            if(curr->key && file_readed <= n_of_files) {
+                strcpy(server_rep.pathname, (char*)curr->key);
+                strcpy(server_rep.data, (char*)curr->data);
+                if (writen(connFd, &server_rep, sizeof(server_rep)) < 0) {
+                    perror("writen");
                     return -1;
                 }
-                fprintf(stream, "%s", (char*)curr->data);
-                printf("File saved: %d\n", file_saved);
-                file_saved++;
-            }
-            if (fclose(stream) != 0) {
-                fprintf(stderr, "Errore nella chiusura del file\n");
-                return -1;
+                memset(&server_rep, 0, sizeof(server_rep));
+                file_readed++;
             }
             curr=curr->next;
         }
     }
-    free(tmp_dirname);
+
     return 0;
 }
 

@@ -11,8 +11,7 @@
 #include <stdio.h>
 #include <pthread.h>
 #include <errno.h>
-
-#include "hash.h"
+#include <dirent.h>
 
 #if !defined(BUFSIZE)
 #define BUFSIZE 256
@@ -55,6 +54,8 @@ typedef struct msg {
 typedef struct file {
   unsigned int status;
   void *data;
+  void *pathname;
+  int client_desc;
 } file;
 
 enum STATUS {
@@ -193,9 +194,11 @@ static inline int TRYLOCK(pthread_mutex_t* l) {
 
 config_file *read_config(char *config); 
 
-int check_for_dir (char *directory);
+int check_for_dir (const char *directory);
 
-int mk_directory (char *directory);
+int mk_directory (const char *directory);
+
+char *get_path(const char *path);
 
 /** Evita letture parziali
  *

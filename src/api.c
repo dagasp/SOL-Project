@@ -1,8 +1,41 @@
 #include "api.h"
-#include "util.h"
-#include "hash.h"
 
 static int fd_skt;
+
+/*Scrive il contenuto di un file sul disco. Se dirname non esiste, verrà creata.
+Ritorna 0 in caso di successo, -1 in caso di errore.*/
+
+int writeToFile(char *pathname, char *content, const char *dirname) {
+    //char *tmp_dirname = calloc(sizeof(char), PATH_MAX);
+     //Controllo che la cartella esista
+    char *tmp_dirname = get_path(dirname); //Prendo path assoluto, se esiste
+    if (!tmp_dirname) {
+        if (mk_directory(dirname) != 0) { //Cartella non esiste-> la creo
+            fprintf(stderr, "Impossibile creare la cartella %s\n", dirname);
+            return -1;
+       }
+       tmp_dirname = get_path(dirname);
+       //strcpy(tmp_dirname, dirname);        
+    }
+    printf("%s\n", tmp_dirname);
+    FILE *stream = NULL;
+    strcat(tmp_dirname, "/");
+    char *fileName = basename(pathname); //Prende il nome del file da pathname
+    //printf("RET: %s\n", ret);
+    if ((stream = fopen(strcat(tmp_dirname, fileName), "w")) == NULL) { 
+            fprintf(stderr, "Errore nell'apertura del file\n");
+            free(tmp_dirname);
+            return -1;
+    }
+    fprintf(stream, "%s", (char*)content);
+    if (fclose(stream) != 0) {
+        fprintf(stderr, "Errore nella chiusura del file\n");
+        free(tmp_dirname);
+        return -1;
+    }
+    free(tmp_dirname);
+    return 0;
+}
 
 int openConnection(const char *sockname, int msec, const struct timespec abstime) {
     errno = 0;
@@ -16,7 +49,6 @@ int openConnection(const char *sockname, int msec, const struct timespec abstime
     SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     while ((r = connect(fd_skt,(struct sockaddr*)&sa,sizeof(sa))) != 0 && abstime.tv_sec > current_time.tv_sec) {
         sleep(msec * 1000);
-        r = 0;
         SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     }
     if (r != -1)
@@ -64,6 +96,7 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     memset(&client_op, 0, sizeof(client_op));
     memset(&server_rep, 0, sizeof(server_rep));
     client_op.op_code = READFILE;
+    //get_path(pathname);
     memcpy(client_op.pathname, pathname, strlen(pathname)+1);
     //strcpy(client_op.pathname, pathname);
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Errore nell'invio della richiesta di lettura\n", "");
@@ -86,19 +119,35 @@ ha meno di ‘N’ file disponibili, li invia tutti. Se N<=0 la richiesta al ser
 memorizzati al suo interno. Ritorna un valore maggiore o uguale a 0 in caso di successo (cioè ritorna il n. di file
 effettivamente letti), -1 in caso di fallimento, errno viene settato opportunamente.
 */
-int readNFiles(int N, const char *dirname) {
+int readNFiles(int N, const char *dirname) { //Controllare se dirname = NULL, in quel caso non memorizzare su disco
     client_operations client_op;
-    //server_reply server_rep;
+    server_reply server_rep;
     memset(&client_op, 0, sizeof(client_op));
+    memset(&server_rep, 0, sizeof(server_rep));
     client_op.op_code = READNFILES;
     client_op.files_to_read = N;
-    strcpy(client_op.dirname, dirname);
+    if (dirname)
+        strcpy(client_op.dirname, dirname);
     int files_letti = 0;
     int n;
     //printf("Sono dentro l'API readNFiles\n");
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
     printf("FILE DA LEGGERE: %d\n", files_letti);
+    if (!dirname) {
+        printf("Ciao\n"); //Non ho ricevuto comando -d, non devo scrivere su file
+        return files_letti;
+    }
+    for (int i = 0; i < files_letti; i++) {
+        SYSCALL_RETURN("readn", n, readn(fd_skt, &server_rep, sizeof(server_rep)), "Errore - impossibile ricevere risposta dal server\n", "");
+        //printf("PATH RICEVUTO: %s\n", server_rep.pathname);
+        //printf("CONTENT RICEVUTO: %s\n", server_rep.data);
+        if (writeToFile(server_rep.pathname, server_rep.data, dirname) != 0) {
+            fprintf(stderr, "Errore nella scrittura dei files\n");
+            return -1;
+        }
+        memset(&server_rep, 0, sizeof(server_rep));
+    }
     if (files_letti >= 0)
         return files_letti;
     else

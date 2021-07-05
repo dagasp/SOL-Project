@@ -19,6 +19,8 @@ void print_usage(const char *program_name) {
 
 fqueue *queue; //Coda delle richieste da inviare al server
 config_file *config; //File di config -- contiene il nome del sockname a cui connettersi e la directory in cui salvare i files
+msg msg_t;
+msg dir_name;
 
 void configuration () {
     if ((config = read_config("./test/config.txt")) == NULL) {
@@ -27,11 +29,11 @@ void configuration () {
     }
 }
 
-void send_request () {
+void send_request (int dFlag) {
     //int err_code;
     node *n;
-    msg msg;
-    n = pop(queue);   
+    memset(&msg_t, 0, sizeof(msg_t));
+    n = pop(queue);  
     char opt = n->op_code;
     switch (opt) {
         case 'r': { //Invio richiesta al server di lettura dei files tramite API readFile
@@ -49,24 +51,36 @@ void send_request () {
             }*/
             else    
                 printf("File aperto\n");
-            msg.data = malloc(sizeof(char)*BUFSIZE);
-            if (!msg.data) {
+            msg_t.data = malloc(sizeof(char)*BUFSIZE);
+            if (!msg_t.data) {
                 fprintf(stderr, "Errore nella malloc\n");
                 break;
             }
            
-            if  ((err_code = readFile((char*)n->data, (void**) (&msg.data),&size) == 0)) {
+            if  ((err_code = readFile((char*)n->data, (void**) (&msg_t.data),&size) == 0)) {
                  printf("Letti %ld bytes\n", size);
             }
-            printf("FILE RICEVUTO: %s\n", msg.data);
-            char *append = "Incredibile prova di append, fantastica";
+            printf("FILE RICEVUTO: %s\n", msg_t.data);
+            
+            /*Debug Append*/
+
+           /* char *append = "Incredibile prova di append, fantastica";
             if (appendToFile("pippo", (void*)append, 40, "boh") == 0)
                 printf("Agg appis\n");
             else
-                printf("Impossibile appendere\n");
+                printf("Impossibile appendere\n");*/
+            
+            
+            if (dFlag != 0) {
+                if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
+                    fprintf(stderr, "Non è stato possibile scrivere sui files\n");
+                    free(msg_t.data);
+                    break;
+                }
+            }
             if (closeFile(n->data) == 0) printf("File chiuso correttamente\n");
             else printf("Non è stato possibile chiudere il file\n");
-            free(msg.data);
+            free(msg_t.data);
             break;
         }
         case 'R': {//Invio richiesta al server di lettura di N files
@@ -74,7 +88,7 @@ void send_request () {
             printf("Sono nella readNFiles\n");
             printf("OP CODE: %c\n", opt);
             int n_files_to_read = *((int*)&n->data);
-            if (readNFiles(n_files_to_read, config->directory) < 0) {
+            if (readNFiles(n_files_to_read, dir_name.data) < 0) {
                 fprintf(stderr, "Non è stato possibile leggere i files dal server\n");
             }
             break;
@@ -92,8 +106,9 @@ int main(int argc, char **argv) {
 	    exit(EXIT_FAILURE);
         }
     int opt;
+    int rFlag = 0, RFlag = 0, dFlag = 0;
     //Da implementare: -h, -f, -r, -R, -t, -p
-    while ((opt = getopt(argc, argv, "hf:w:W:D:r:R:d:t:l:u:c:p")) != -1) {
+    while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R:t:l:u:c:p")) != -1) {
         switch(opt) {
             case 'h': {
                 print_usage(argv[0]);
@@ -107,6 +122,7 @@ int main(int argc, char **argv) {
                 printf("E' stata chiesta la readFile\n");
                 data = optarg;
                 insert(queue, 'r', (void*)data);
+                rFlag = 1;
                 //inserire richiesta in lista -
                 break;
             }
@@ -117,8 +133,18 @@ int main(int argc, char **argv) {
                     break;
                 }
                 insert(queue, 'R', (void*)n_files);
+                RFlag = 1;
                 break;
             }
+            case 'd':
+            printf("%d\n", rFlag);
+                if (rFlag == 0 && RFlag == 0) {
+                    fprintf(stderr, "Errore, il comando -d va usato congiuntamente a -r o -R\n");
+                    return -1;
+                }
+                dFlag = 1;
+                dir_name.data = optarg;
+                break;
             default: 
                 printf("Opzione non supportata\n");
                 break;
@@ -135,7 +161,7 @@ int main(int argc, char **argv) {
     time.tv_sec += 5;
     openConnection(config->sock_name, 1000, time);
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
-        send_request();
+        send_request(dFlag);
     }
     if (closeConnection(config->sock_name) == 0)
         printf("Connessione chiusa\n");

@@ -16,6 +16,7 @@
 #include <sys/un.h>
 #include <time.h>
 #include <limits.h>
+#include <libgen.h>
 
 #include "util.h"
 
@@ -71,5 +72,6 @@ int writeFile(const char *pathname, const char *dirname);
 int appendToFile(const char *pathname, void *buf, size_t size, const char *dirname);
 
 int closeFile(const char *pathname); 
+int writeToFile(char *pathname, char *content, const char *dirname);
 
 #endif

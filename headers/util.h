@@ -52,8 +52,10 @@ typedef struct msg {
 } msg;
 
 typedef struct file {
-  unsigned int status;
+  int status; 
+  int ciao; 
   void *data;
+  pthread_mutex_t lock_file;
   void *pathname;
   int client_desc;
 } file;

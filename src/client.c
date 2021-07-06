@@ -22,11 +22,29 @@ config_file *config; //File di config -- contiene il nome del sockname a cui con
 msg msg_t;
 msg dir_name;
 
-void configuration () {
-    if ((config = read_config("./test/config.txt")) == NULL) {
-        fprintf(stderr, "Errore nella lettura del file config.txt\n");
-        exit(EXIT_FAILURE);
+char ** tokenize_args(char *args, size_t *how_many) {
+    size_t size;
+    char *p = args;
+    while (*p != '\0') {
+        if (*p == ',')
+            size++;
+        ++p; 
     }
+    *how_many = size;
+    char **arg = malloc(sizeof(char*)*size);
+    if (!arg) {
+        fprintf(stderr, "Errore nella malloc\n");
+        return NULL;
+    }
+    char *token = strtok(args, ",");
+    int i = 0;
+    while (token) {
+        arg[i] = strdup(token);
+        token = strtok(NULL, ",");
+        i++;
+    }
+    //*(arg + index) = 0;
+    return arg;
 }
 
 void send_request (int dFlag) {
@@ -115,7 +133,9 @@ int main(int argc, char **argv) {
                 return 0;
             }
             case 'f': {
-                //da implementare
+                //printf("%s\n", optarg);
+                char **args = tokenize_args(optarg);
+
                 break;
             }
             case 'r': {

@@ -39,7 +39,7 @@ typedef struct client_operations {
     char pathname[BUFSIZE];
     char data[BUFSIZE];
     char dirname [DIR_SIZE];
-    FILE *fp;
+    int client_desc;
     unsigned int op_code;
     int flags;
     int feedback;

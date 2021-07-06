@@ -16,7 +16,7 @@
 #include "hash.h"
 #include "threadpool.h"
 #include "api.h"
-
+#include "list.h"
 
 /**
  *  @struct sigHandlerArgs_t
@@ -34,6 +34,8 @@ static config_file *conf;
 //Hash table dei file e la sua mutex
 static icl_hash_t *hTable = NULL; 
 pthread_mutex_t files = PTHREAD_MUTEX_INITIALIZER;
+
+node *file_list; //Lista dei file aperti
 
 threadpool_t *pool = NULL;
 
@@ -101,7 +103,7 @@ void threadWorker(void *arg) {
     printf("PATHNAME RICEVUTO: %s\n", client_op.pathname);
     int op_code = client_op.op_code;
     switch (op_code) {
-     case OPENFILE:
+     case OPENFILE: //AGGIUNGERE O_CREATE IN OR CON O_LOCK
         //printf("FLAGS: %d\n", client_op.flags);
            if (client_op.flags == O_CREATE) {
                 if (icl_hash_find(hTable, (void*) client_op.pathname) != NULL) { // != NULL -> file esiste
@@ -114,7 +116,7 @@ void threadWorker(void *arg) {
                     break;
                 } 
                 else { //Creo il file
-                    icl_hash_insert(hTable, client_op.pathname, (void*)NULL); //per ora NULL, poi vedere se stanziare memoria per buffer
+                    icl_hash_insert(hTable, client_op.pathname, (void*)NULL); 
                     printf("File creato correttamente\n");
                     int feedback = SUCCESS;
                     if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
@@ -143,15 +145,17 @@ void threadWorker(void *arg) {
                 } 
                 else { //File esiste
                     printf("Trying to open the file...\n");
-                    int rep = open_file(hTable, (void*)client_op.pathname); //Apro il file
-                    if (rep == 0) { //Apertura file con successo, segnalo
-                        printf("File aperto nella HTABLE\n");
+                    put_by_key(&file_list,client_op.pathname,client_op.client_desc);
+                    print_q(file_list);
+                    //int rep = open_file(hTable, (void*)client_op.pathname); //Apro il file
+                    //if (rep == 0) { //Apertura file con successo, segnalo
+                        printf("File aperto\n");
                         int fb = SUCCESS;
                         if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen");
                             break;
                         }      
-                    } 
+                    //} 
                 }
                 break;
             }
@@ -174,7 +178,7 @@ void threadWorker(void *arg) {
             //free(msg.data);
             break;
         }
-        if (is_file_open(hTable, client_op.pathname) == OPEN) { //Se il file è aperto lo copio
+        if (list_contain_file(file_list, client_op.pathname, client_op.client_desc) == 0) { //Se il file è aperto lo copio
             printf("File is open - SUCCESS\n");
             msg.size = strnlen(msg.data, BUFSIZE);
             printf("MSG SIZE IS: %ld\n", msg.size);
@@ -220,7 +224,7 @@ void threadWorker(void *arg) {
                     break;     
             }
             if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //File letti correttamente
-                printf("ok");  
+                printf("ok\n");  
             }
             else printf("NOT OK \n");
         }        
@@ -249,20 +253,29 @@ void threadWorker(void *arg) {
             }
             break;
         case CLOSEFILE:
-            if (close_file(hTable, client_op.pathname) == 0) { //File chiuso correttamente 
-                int fb = SUCCESS;
-                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                if (delete_by_key(&file_list, client_op.pathname) == 0) { //File chiuso correttamente 
+                    int fb = SUCCESS;
+                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback closeFile");
                             break;
-                }
-                else { //Non sono riuscito a chiudere il file
+                    }
+                    else { //Non sono riuscito a chiudere il file
+                        int fb = FAILED;
+                        if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                            perror("writen negative feedback closeFile");
+                            break;
+                        } 
+                    }
+                } 
+                else {
                     int fb = FAILED;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen negative feedback closeFile");
                             break;
                     } 
-                } 
-            }
+                }  
+                
+            
         /*case CLOSECONNECTION: ;
            // FD_CLR(connFd, &set);
             int fb = SUCCESS;
@@ -285,6 +298,7 @@ void destroy_everything(int force) {
     icl_hash_destroy(hTable, NULL, free);
     destroyThreadPool(pool, force);  // notifico che i thread dovranno uscire
     unlink(conf->sock_name);
+    free(file_list);
     free(conf);
 }
 
@@ -295,12 +309,21 @@ int main (int argc, char **argv) {
         exit(EXIT_FAILURE);
     }
     hTable = icl_hash_create(20, NULL, NULL);
+    file_list = NULL;
     //icl_entry_t *entry
-    
     /*Debug inserimento file server*/    
-    icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/pippo", "prova contenuto");
+    icl_hash_insert(hTable, "pippo", "prova contenuto");
     icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/gianni", "contenuto incredibile");
     icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnie", "questo è un contenuto fantastico");
+    /*insert_by_key(file_list, "albertino", 5);
+    insert_by_key(file_list, "pippo", 5);
+    insert_by_key(file_list, "gianni", 5);
+    print_q(file_list);
+    remove_by_key(file_list, "uberti");
+    remove_by_key(file_list, "ubertini");
+    printf("--------------------------\n");
+    print_q(file_list);
+    */
     /*Fine debug*/
     //icl_hash_dump(stdout, hTable);
 

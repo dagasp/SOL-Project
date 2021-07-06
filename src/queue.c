@@ -9,6 +9,10 @@ fqueue *create () {
 
 void insert (fqueue *queue, unsigned int opcode, void *value) {
     node *tmp = malloc(sizeof(struct node));
+    if (!tmp) {
+        fprintf(stderr, "Errore nella malloc\n");
+        return;
+    }
     tmp->op_code = opcode;
     tmp->data = value;
     tmp->next = NULL;

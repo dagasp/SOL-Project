@@ -21,7 +21,6 @@ extern "C" {
 typedef struct icl_entry_s {
     void* key;
     void *data;
-    int status; //-1 NO, 0 SI
     int modified; //File modificato - 0-> SI, 1 -> NO
     struct icl_entry_s* next;
 } icl_entry_t;
@@ -64,12 +63,6 @@ int
 string_compare(void* a, void* b);
 
 /* Funzioni aggiunte*/
-int open_file(icl_hash_t *, void * key);
-
-int close_file(icl_hash_t *, void *key);
-
-int is_file_open(icl_hash_t *, void *key);
-
 int get_n_entries (icl_hash_t *);
 
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size);

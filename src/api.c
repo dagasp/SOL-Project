@@ -73,6 +73,7 @@ int openFile(const char *pathname, int flags) {
     memset(&client_op, 0, sizeof(client_op));
     client_op.flags = flags;
     client_op.op_code = OPENFILE;
+    client_op.client_desc = fd_skt;
     strcpy(client_op.pathname,pathname);
     int n, rep_code;
     SYSCALL_RETURN("writen", n, writen(fd_skt, &client_op, sizeof(client_op)), "Errore nell'invio della richiesta di apertura file\n", "");
@@ -96,6 +97,7 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     memset(&client_op, 0, sizeof(client_op));
     memset(&server_rep, 0, sizeof(server_rep));
     client_op.op_code = READFILE;
+    client_op.client_desc = fd_skt;
     //get_path(pathname);
     memcpy(client_op.pathname, pathname, strlen(pathname)+1);
     //strcpy(client_op.pathname, pathname);

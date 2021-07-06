@@ -3,10 +3,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 typedef struct node {
     unsigned int op_code;
     void *data;
+    int descriptor;
     struct node *next;
 } node;
 

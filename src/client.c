@@ -47,7 +47,7 @@ char ** tokenize_args(char *args, size_t *how_many) {
     return arg;
 }
 
-void send_request (int dFlag) {
+void send_request (int dFlag, int pFlag) {
     //int err_code;
     node *n;
     memset(&msg_t, 0, sizeof(msg_t));
@@ -123,19 +123,18 @@ int main(int argc, char **argv) {
 	    print_usage(argv[0]);
 	    exit(EXIT_FAILURE);
         }
+    //char *sock_name;
     int opt;
-    int rFlag = 0, RFlag = 0, dFlag = 0;
+    int rFlag = 0, RFlag = 0, dFlag = 0, pFlag = 0;
     //Da implementare: -h, -f, -r, -R, -t, -p
-    while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R:t:l:u:c:p")) != -1) {
+    while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R::t::l:u:c:p")) != -1) {
         switch(opt) {
             case 'h': {
                 print_usage(argv[0]);
                 return 0;
             }
             case 'f': {
-                //printf("%s\n", optarg);
-                char **args = tokenize_args(optarg);
-
+                //sock_name = optarg;
                 break;
             }
             case 'r': {
@@ -150,14 +149,14 @@ int main(int argc, char **argv) {
                 //int err;
                 if (isNumber(optarg, &n_files) != 0) {
                     fprintf(stderr, "Non è stato inserito un numero\n");
-                    break;
+                    //break;
                 }
+                printf("%ld\n", n_files);
                 insert(queue, 'R', (void*)n_files);
                 RFlag = 1;
                 break;
             }
             case 'd':
-            printf("%d\n", rFlag);
                 if (rFlag == 0 && RFlag == 0) {
                     fprintf(stderr, "Errore, il comando -d va usato congiuntamente a -r o -R\n");
                     return -1;
@@ -165,6 +164,8 @@ int main(int argc, char **argv) {
                 dFlag = 1;
                 dir_name.data = optarg;
                 break;
+            case 'p':
+                pFlag = 1;
             default: 
                 printf("Opzione non supportata\n");
                 break;
@@ -181,7 +182,7 @@ int main(int argc, char **argv) {
     time.tv_sec += 5;
     openConnection(config->sock_name, 1000, time);
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
-        send_request(dFlag);
+        send_request(dFlag, pFlag);
     }
     if (closeConnection(config->sock_name) == 0)
         printf("Connessione chiusa\n");

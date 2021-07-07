@@ -12,9 +12,14 @@
 #include <pthread.h>
 #include <errno.h>
 #include <dirent.h>
+#include <limits.h>
 
 #if !defined(BUFSIZE)
 #define BUFSIZE 256
+#endif
+
+#if !defined(MAX_FILE_SIZE)
+#define MAX_FILE_SIZE 1000000
 #endif
 
 #if !defined(EXTRA_LEN_PRINT_ERROR)
@@ -43,27 +48,13 @@ typedef struct config_file {
     unsigned int num_of_threads;
     unsigned int num_of_files;
     char sock_name[BUFSIZE];
-    char directory[BUFSIZE];
+    char directory[PATH_MAX];
 } config_file;
 
 typedef struct msg {
   char *data;
   size_t size;
 } msg;
-
-typedef struct file {
-  int status; 
-  int ciao; 
-  void *data;
-  pthread_mutex_t lock_file;
-  void *pathname;
-  int client_desc;
-} file;
-
-enum STATUS {
-  OPEN = 0, 
-  CLOSED = -1
-};
 
 #define SYSCALL_EXIT(name, r, sc, str, ...)	\
     if ((r=sc) == -1) {				\

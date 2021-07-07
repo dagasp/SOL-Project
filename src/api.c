@@ -167,6 +167,7 @@ int appendToFile(const char *pathname, void *buf, size_t size, const char *dirna
     memset(&client_op, 0, sizeof(client_op));
     client_op.op_code = APPENDTOFILE;
     client_op.size = size;
+    client_op.client_desc = fd_skt;
     strcpy(client_op.pathname, pathname);
     memcpy(client_op.data, buf, size);
     int n, fb;

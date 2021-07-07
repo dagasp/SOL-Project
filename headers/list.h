@@ -6,22 +6,30 @@
 #include <string.h>
 #include <limits.h>
 
+enum STATUS {
+  OPEN = 0, 
+  CLOSED = -1
+};
+
 typedef struct node {
     char pathname[PATH_MAX];
     int descriptor;
     int curr_size;
+    int file_status;
     struct node *next;
-} node;
+} list;
 
-void init(node *list);
+void init(list *list);
 
-void put_by_key (node **head, const char *key, int desc);
+void put_by_key (list **head, const char *key, int desc);
+int insert_file(list **head, char *path);
+char *get_last_file(list *l);
+void delete_last_element(list **head);
+int delete_by_key(list **head, char *k);
 
-int delete_by_key(node **head, char *k);
+void print_q(list *list);
 
-void print_q(node *list);
-
-int list_contain_file(node *list, char *, int);
+int list_contain_file(list *list, char *, int);
 
 
 #endif

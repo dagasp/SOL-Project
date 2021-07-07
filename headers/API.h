@@ -24,6 +24,7 @@
 #define DIR_SIZE 20
 #define O_CREATE 0
 #define O_LOCK 1
+#define O_CREATE_OR_O_LOCK 2
 
 enum OP_CODE {
     OPENFILE = 0,
@@ -36,9 +37,9 @@ enum OP_CODE {
 };
 
 typedef struct client_operations {
-    char pathname[BUFSIZE];
-    char data[BUFSIZE];
-    char dirname [DIR_SIZE];
+    char pathname[PATH_MAX];
+    char data[MAX_FILE_SIZE];
+    char dirname [PATH_MAX];
     int client_desc;
     unsigned int op_code;
     int flags;
@@ -48,8 +49,8 @@ typedef struct client_operations {
 } client_operations;
 
 typedef struct server_reply {
-    char pathname[BUFSIZE];
-    char data[BUFSIZE];
+    char pathname[PATH_MAX];
+    char data[MAX_FILE_SIZE];
     unsigned int size;
     unsigned int reply_code;
     int n_files_letti;

@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include "util.h"
 #include "api.h"
+#include "list.h"
 
 #if defined(c_plusplus) || defined(__cplusplus)
 extern "C" {
@@ -28,16 +29,16 @@ typedef struct icl_entry_s {
 typedef struct icl_hash_s {
     int nbuckets;
     int nentries;
-    int max_size;
-    int curr_size;
-    int max_files;
+    size_t max_size;
+    size_t curr_size;
+    long max_files;
     icl_entry_t **buckets;
     unsigned int (*hash_function)(void*);
     int (*hash_key_compare)(void*, void*);
 } icl_hash_t;
 
 icl_hash_t *
-icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*));
+icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*), size_t s, long max);
 
 void
 * icl_hash_find(icl_hash_t *, void* key);
@@ -64,6 +65,8 @@ string_compare(void* a, void* b);
 
 /* Funzioni aggiunte*/
 int get_n_entries (icl_hash_t *);
+
+
 
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size);
 

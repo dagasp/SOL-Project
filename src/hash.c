@@ -76,7 +76,7 @@ int get_n_entries(icl_hash_t *t) {
  */
 
 icl_hash_t *
-icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*))
+icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_key_compare)(void*, void*), size_t maxSize, long maxFiles)
 {
     icl_hash_t *ht;
     int i;
@@ -95,7 +95,9 @@ icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_
     //ht->max_files = max_files;
     ht->hash_function = hash_function ? hash_function : hash_pjw;
     ht->hash_key_compare = hash_key_compare ? hash_key_compare : string_compare;
-
+    ht->curr_size = 0;
+    ht->max_size = maxSize;
+    ht->max_files = maxFiles;
     return ht;
 }
 
@@ -125,6 +127,15 @@ icl_hash_find(icl_hash_t *ht, void* key)
 
     return NULL;
 }
+/**
+ * Append something to an item in the hash table.
+ *
+ * @param ht -- the hash table
+ * @param key -- the key of the new item
+ * @param data -- pointer to the new item's data
+ *
+ * @returns pointer to the new item.  Returns NULL on error.
+ */
 
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     icl_entry_t* curr;
@@ -133,16 +144,19 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     if(!ht || !key) return -1;
 
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
-    char *data = calloc(sizeof(char), BUFSIZE);
+    char *data = calloc(sizeof(char), MAX_FILE_SIZE);
     if (!data) {
         return -1;
     }
+    if (ht->curr_size + size > ht->max_size) return -1;
+
     for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
         if ( ht->hash_key_compare(curr->key, key)) {
-            strncpy(data, (char*)curr->data, BUFSIZE);
-            strncat(data, new_data, BUFSIZE);
+            strncpy(data, (char*)curr->data, MAX_FILE_SIZE);
+            strncat(data, new_data, MAX_FILE_SIZE);
             curr->data = (void*)data;
             curr->modified = 0; //Ho modificato -- serve per sapere dove liberare memoria alla fine
+            ht->curr_size += size;
         }
     return 0;
 }
@@ -164,14 +178,19 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
 {
     icl_entry_t *curr;
     unsigned int hash_val;
-
+    size_t len_of_data;
     if(!ht || !key) return NULL;
-
+    if (data) {
+        len_of_data = strnlen((char*)data, MAX_FILE_SIZE);
+    }
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
 
     for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
         if ( ht->hash_key_compare(curr->key, key))
             return(NULL); /* key already exists */
+    
+    /*Superata la memoria*/
+    if (len_of_data > ht->max_size) return NULL; //Se il file è più grande della capienza massima della tabella, non lo inserisco
 
     /* if key was not found */
     curr = (icl_entry_t*)malloc(sizeof(icl_entry_t));
@@ -183,7 +202,8 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     curr->next = ht->buckets[hash_val]; /* add at start */
     ht->buckets[hash_val] = curr;
     ht->nentries++;
-
+    ht->curr_size += len_of_data;
+    printf("Curr size is %ld, Max size is %ld\n", ht->curr_size, ht->max_size);
     return curr;
 }
 
@@ -240,19 +260,7 @@ icl_hash_update_insert(icl_hash_t *ht, void* key, void *data, void **olddata)
     return curr;
 }
 
-/*
-void get_file(icl_hash_t *t, char pathname[r][c], char content[r][c]) {
-    void *kp, *dp;
-    icl_entry_t *curr;
-    for (int i=0;i<t->nbuckets; i++) {
-        for (curr=t->buckets[i];curr!=NULL&&((kp=curr->key)!=NULL)&&((dp=curr->data)!=NULL);curr=curr->next) {
-           //printf("PATHNAME: %s\n", (char*)curr->key);
-           //printf("CONTENT: %s\n", (char*)curr->data);
-           strcpy(pathname[i], (char*)curr->key);
-        }
-    }
-}
-*/
+
 /**
  * Free one hash table entry located by key (key and data are freed using functions).
  *
@@ -281,7 +289,7 @@ int icl_hash_delete(icl_hash_t *ht, void* key, void (*free_key)(void*), void (*f
             }
             if (*free_key && curr->key) (*free_key)(curr->key);
             if (*free_data && curr->data) (*free_data)(curr->data);
-            ht->nentries++;
+            ht->nentries--;
             free(curr);
             return 0;
         }

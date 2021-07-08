@@ -20,7 +20,7 @@
 
 #include "util.h"
 
-#define UNIX_PATH_MAX 108 
+#define UNIX_MAX_PATH 108 
 #define DIR_SIZE 20
 #define O_CREATE 0
 #define O_LOCK 1
@@ -37,9 +37,9 @@ enum OP_CODE {
 };
 
 typedef struct client_operations {
-    char pathname[PATH_MAX];
+    char pathname[MAX_PATH];
     char data[MAX_FILE_SIZE];
-    char dirname [PATH_MAX];
+    char dirname [MAX_PATH];
     int client_desc;
     unsigned int op_code;
     int flags;
@@ -49,7 +49,7 @@ typedef struct client_operations {
 } client_operations;
 
 typedef struct server_reply {
-    char pathname[PATH_MAX];
+    char pathname[MAX_PATH];
     char data[MAX_FILE_SIZE];
     unsigned int size;
     unsigned int reply_code;

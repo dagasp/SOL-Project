@@ -22,15 +22,16 @@ config_file *config; //File di config -- contiene il nome del sockname a cui con
 msg msg_t;
 msg dir_name;
 
-char ** tokenize_args(char *args, size_t *how_many) {
-    size_t size;
+char ** tokenize_args(char *args, unsigned int *hM) {
+    size_t size = 1;
     char *p = args;
     while (*p != '\0') {
         if (*p == ',')
             size++;
         ++p; 
     }
-    *how_many = size;
+    *hM = size;
+    size+=1;
     char **arg = malloc(sizeof(char*)*size);
     if (!arg) {
         fprintf(stderr, "Errore nella malloc\n");
@@ -82,13 +83,11 @@ void send_request (int dFlag, int pFlag) {
             
             /*Debug Append*/
 
-           /* char *append = "Incredibile prova di append, fantastica";
+            /*char *append = "Incredibile prova di append, fantastica";
             if (appendToFile("pippo", (void*)append, 40, "boh") == 0)
                 printf("Agg appis\n");
             else
                 printf("Impossibile appendere\n");*/
-            
-            
             if (dFlag != 0) {
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
                     fprintf(stderr, "Non è stato possibile scrivere sui files\n");
@@ -117,7 +116,6 @@ void send_request (int dFlag, int pFlag) {
 
 int main(int argc, char **argv) {
     queue = create();
-    char *data = NULL;
     long n_files = 0;
      if (argc == 1) {
 	    print_usage(argv[0]);
@@ -138,9 +136,17 @@ int main(int argc, char **argv) {
                 break;
             }
             case 'r': {
-                printf("E' stata chiesta la readFile\n");
-                data = optarg;
-                insert(queue, 'r', (void*)data);
+                char **to_do = NULL;
+                unsigned int how_many;
+                to_do = tokenize_args(optarg, &how_many);
+                int i = 0;
+                while (how_many > 0) {
+                    printf("%d\n", i);
+                    insert(queue, 'r', (void*)to_do[i]);
+                    i++;
+                    how_many--;
+                }
+                //insert(queue, 'r', (void*)data);
                 rFlag = 1;
                 //inserire richiesta in lista -
                 break;

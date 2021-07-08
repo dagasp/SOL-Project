@@ -19,7 +19,11 @@
 #endif
 
 #if !defined(MAX_FILE_SIZE)
-#define MAX_FILE_SIZE 1000000
+#define MAX_FILE_SIZE 800000
+#endif
+
+#if !defined(MAX_PATH)
+#define MAX_PATH 256
 #endif
 
 #if !defined(EXTRA_LEN_PRINT_ERROR)

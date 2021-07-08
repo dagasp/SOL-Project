@@ -6,7 +6,7 @@ void put_by_key(list **head, const char *key, int desc) {
         fprintf(stderr, "Errore nella malloc\n");
         return;
     }
-    strncpy(tmp->pathname, key, PATH_MAX);
+    strncpy(tmp->pathname, key, MAX_PATH);
     tmp->descriptor = desc;
     tmp->next = *head;
     *head = tmp;
@@ -18,7 +18,7 @@ int delete_by_key(list **head, char *k) {
     while (tmp != NULL) {
        // printf("QUEUE DATA: %s\n", (char*)tmp->data);
         //printf("KEY DATA: %s\n", (char*)k);
-        if (strncmp(tmp->pathname, k, PATH_MAX) == 0) {
+        if (strncmp(tmp->pathname, k, MAX_PATH) == 0) {
             if (prev == NULL) {
                 free(tmp);
                 *head = NULL;
@@ -40,7 +40,7 @@ int list_contain_file(list *l, char *path, int desc) {
     list *tmp = l;
     while (tmp != NULL) {
         if (tmp->pathname != NULL)
-        if ((strncmp((char*)tmp->pathname, path, PATH_MAX) == 0) && tmp->descriptor == desc)
+        if ((strncmp((char*)tmp->pathname, path, MAX_PATH) == 0) && tmp->descriptor == desc)
             return 0; //File found, aperto
         tmp = tmp->next; 
     }
@@ -50,7 +50,7 @@ int list_contain_file(list *l, char *path, int desc) {
 int insert_file(list **head, char *path) {
     list *curr;
     for (curr=*head; curr != NULL; curr=curr->next)
-        if (strncmp(curr->pathname, path, PATH_MAX) == 0)
+        if (strncmp(curr->pathname, path, MAX_PATH) == 0)
             return -1; /* File esiste già */
 
     //File non esiste in lista
@@ -59,7 +59,7 @@ int insert_file(list **head, char *path) {
         fprintf(stderr, "Errore nella malloc\n");
         return -1;
     }
-    strncpy(tmp->pathname, path, PATH_MAX);
+    strncpy(tmp->pathname, path, MAX_PATH);
     tmp->next = *head;
     *head = tmp;
     return 0;
@@ -91,6 +91,7 @@ void delete_last_element(list **head) {
 void print_q(list *list) {
     while (list != NULL) {
         printf("QUEUE DATA: %s\n", (char*)list->pathname);
+        printf("SOCKET ASSOCIATED: %d\n", list->descriptor);
         list = list->next;
     }
 }

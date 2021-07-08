@@ -9,7 +9,7 @@
 
 #ifndef icl_hash_h
 #define icl_hash_h
-
+#define _GNU_SOURCE  
 #include <stdio.h>
 #include "util.h"
 #include "api.h"
@@ -42,6 +42,9 @@ icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_
 
 void
 * icl_hash_find(icl_hash_t *, void* key);
+
+int 
+icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append);
 
 icl_entry_t
 * icl_hash_insert(icl_hash_t *, void*, void *),

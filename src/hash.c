@@ -127,6 +127,26 @@ icl_hash_find(icl_hash_t *ht, void* key)
 
     return NULL;
 }
+int 
+icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append)
+{
+    icl_entry_t* curr;
+    unsigned int hash_val;
+
+    if(!ht || !key) return -1;
+    if (!data_to_append) return -1;
+
+    hash_val = (* ht->hash_function)(key) % ht->nbuckets;
+
+    for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if ( ht->hash_key_compare(curr->key, key)) {
+            free(curr->data); //Libero la vecchia memoria
+            curr->data = data_to_append; //Aggiorno il puntatore
+        }
+
+    return 0;
+}
+
 /**
  * Append something to an item in the hash table.
  *
@@ -137,29 +157,27 @@ icl_hash_find(icl_hash_t *ht, void* key)
  * @returns pointer to the new item.  Returns NULL on error.
  */
 
-int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
-    icl_entry_t* curr;
-    unsigned int hash_val;
 
-    if(!ht || !key) return -1;
-
-    hash_val = (* ht->hash_function)(key) % ht->nbuckets;
-    char *data = calloc(sizeof(char), MAX_FILE_SIZE);
+int append (icl_hash_t *ht, void *key, char *new_data, size_t size) { 
+    if (!ht || !key) return -1;
+    if (!new_data) return -1;
+    char *data = icl_hash_find(ht, key);
     if (!data) {
         return -1;
     }
-    if (ht->curr_size + size > ht->max_size) return -1;
-
-    for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
-        if ( ht->hash_key_compare(curr->key, key)) {
-            strncpy(data, (char*)curr->data, MAX_FILE_SIZE);
-            strncat(data, new_data, MAX_FILE_SIZE);
-            curr->data = (void*)data;
-            curr->modified = 0; //Ho modificato -- serve per sapere dove liberare memoria alla fine
-            ht->curr_size += size;
-        }
-    return 0;
+    size_t oldsize = strlen(data);
+    char *res = malloc(oldsize+size+1);
+    if (!res) {
+        fprintf(stderr, "Errore nella malloc\n");
+        return -1;
+    }
+    memcpy(res, data, oldsize);
+    memcpy(res+oldsize, new_data, size+1);
+    if (icl_hash_find_and_append(ht, key, (void*)res) == 0)
+        return 0;
+    return -1;
 }
+
 
 /**
  * Insert an item into the hash table.
@@ -203,7 +221,7 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     ht->buckets[hash_val] = curr;
     ht->nentries++;
     ht->curr_size += len_of_data;
-    printf("Curr size is %ld, Max size is %ld\n", ht->curr_size, ht->max_size);
+    //printf("Curr size is %ld, Max size is %ld\n", ht->curr_size, ht->max_size);
     return curr;
 }
 
@@ -288,7 +306,11 @@ int icl_hash_delete(icl_hash_t *ht, void* key, void (*free_key)(void*), void (*f
                 prev->next = curr->next;
             }
             if (*free_key && curr->key) (*free_key)(curr->key);
-            if (*free_data && curr->data) (*free_data)(curr->data);
+            if (*free_data && curr->data) {
+                size_t old_size = strlen((char*)curr->data); //Peso in byte del file che sto per eliminare
+                (*free_data)(curr->data);
+                ht->curr_size -= old_size; //Diminuisco l'attuale memoria utilizzata di 'old_size' byte
+            } 
             ht->nentries--;
             free(curr);
             return 0;
@@ -322,7 +344,7 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
             next=curr->next;
             if (*free_key && curr->key) (*free_key)(curr->key);
             if (*free_data && curr->data) {
-                if (curr->modified == 0) //Se ho fatto l'append al file libero la memoria
+                if (curr->modified == 1) //Se ho fatto l'append al file libero la memoria
                     (*free_data)(curr->data);
             }
             free(curr);
@@ -362,7 +384,7 @@ icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
                 strcpy(server_rep.pathname, (char*)curr->key);
                 strcpy(server_rep.data, (char*)curr->data);
                 if (writen(connFd, &server_rep, sizeof(server_rep)) < 0) {
-                    perror("writen");
+                    perror("writenDump");
                     return -1;
                 }
                 memset(&server_rep, 0, sizeof(server_rep));

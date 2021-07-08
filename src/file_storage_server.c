@@ -83,11 +83,16 @@ int updatemax(fd_set set, int fdmax) {
 }
 
 
-int check_numOfFiles_FIFO() {
+/*
+*Controlla che il file storage possa contenere almeno un altro file, in caso contrario toglie il primo file inserito (FIFO)
+*
+*/
+int check_numOfFiles_FIFO() { 
     if (hTable->nentries + 1 > hTable->max_files) { //Devo eliminare un file
         printf("Ho raggiunto il massimo numero di file, elimino il primo inserito\n");
         char *to_delete = get_last_file(file_list); //Prendo il primo inserito - FIFO
-        if (icl_hash_delete(hTable, (void*)to_delete, NULL, NULL) == 0) { //Lo elimino dalla tabella, DEVO TOGLIERLO ANCHE DALLA LISTA DEI FILE
+        if (!to_delete) return -1;
+        if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
             printf("File eliminato correttamente dalla tabella\n");
             delete_last_element(&file_list);
             return 0;
@@ -96,14 +101,21 @@ int check_numOfFiles_FIFO() {
     return -1; //Non ho avuto bisogno di eliminare file
 }
 
+/*
+*Controlla che il file storage abbia spazio in memoria per un nuovo file, in caso contrario toglie il primo file inserito ricorsivamente
+*fino a quando non c'è abbastanza spazio (FIFO)
+*new_size - il peso in byte del file da inserire
+*/
+
 void check_memory_FIFO(size_t new_size) {
-    if (new_size == 0) return;
-    if (hTable->curr_size + new_size > hTable->max_size) {
+    if (new_size == 0) return; //Se il file da inserire è vuoto, esco per inserirlo subito
+    if (hTable->curr_size + new_size > hTable->max_size) { //Memoria superata-> ho bisogno di liberare spazio
         printf("Ho raggiunto la dimensione massima della memoria, elimino il primo file inserito\n");
         char *to_delete = get_last_file(file_list);
-        if (icl_hash_delete(hTable, (void*)to_delete, free, free) == 0) {
+        if (!to_delete) return;
+        if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
             printf("File eliminato correttamente\n");
-            delete_last_element(&file_list); //Lo elimino dalla tabella, DEVO TOGLIERLO ANCHE DALLA LISTA DEI FILE
+            delete_last_element(&file_list); 
         } 
         check_memory_FIFO(new_size);  
     }
@@ -129,7 +141,7 @@ void threadWorker(void *arg) {
         fprintf(stderr, "Impossibile leggere dal client\n");
         return;
     }
-    if (r == 0) { //Il client ha finito le richieste -- chiudo la connessione
+    else if (r == 0) { //Il client ha finito le richieste -- chiudo la connessione
         close(connFd);
         return;
     }
@@ -150,7 +162,7 @@ void threadWorker(void *arg) {
                     break;
                 } 
                 else { //Creo il file
-                    if (icl_hash_insert(hTable, client_op.pathname, (void*)NULL) != NULL) {
+                    if (icl_hash_insert(hTable, client_op.pathname, client_op.data) != NULL) {
                         printf("File creato correttamente\n");
                         if (insert_file(&file_list, client_op.pathname) != 0)
                             printf("File già presente in coda, non inserito\n");
@@ -193,11 +205,9 @@ void threadWorker(void *arg) {
                 else { //File esiste
                     printf("Trying to open the file...\n");
                     put_by_key(&open_file,client_op.pathname,client_op.client_desc); //Lo inserisco nella lista dei files aperti
-                    print_q(open_file);
-                    //int rep = open_file(hTable, (void*)client_op.pathname); //Apro il file
-                    //if (rep == 0) { //Apertura file con successo, segnalo
                         printf("File aperto\n");
                         int fb = SUCCESS;
+                        printf("FBFBFB %d\n", fb);
                         if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen");
                             break;
@@ -207,22 +217,14 @@ void threadWorker(void *arg) {
                 break;
             }
         case READFILE:
-        printf("Sono nella readfile\n");
-       // msg.data = malloc(sizeof(char)*BUFSIZE);
-        /*if (!msg.data) {
-            fprintf(stderr, "Errore nella malloc\n");
-            break;
-        }*/
         msg.data = icl_hash_find(hTable, client_op.pathname); //Prendo il file dalla hashTable
         if (msg.data == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep.reply_code = FAILED; //-1
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-               // free(msg.data);
                 perror("writen");
                 break;
             }
-            //free(msg.data);
             break;
         }
         if (list_contain_file(open_file, client_op.pathname, client_op.client_desc) == 0) { //Se il file è nella lista dei file aperti da quel client, lo copio
@@ -232,32 +234,28 @@ void threadWorker(void *arg) {
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size);
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-                //free(msg.data);
                 perror("writen");
                 break;
             }
-            //free(msg.data);
         }
         else { //Il file non era in lista, non è stato aperto, non è stato possibile leggerlo
             printf("File is closed - FAILED\n");
             server_rep.reply_code = FAILED;
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
-                //free(msg.data);
                 perror("writen");
                 break;
             }
-            //free(msg.data);
         }
         break;
         case READNFILES: { 
         int n_of_files;
-        printf("SONO NELLA READNFILES\n");
+        printf("IL CLIENT VUOLE LEGGERE %d FILE\n", client_op.files_to_read);
         n_of_files = client_op.files_to_read;
         int available_files = get_n_entries(hTable);
         if (n_of_files <= 0 || available_files < n_of_files) { //Il server deve leggere tutti i file disponibili
             int n_stored_files = available_files; 
             if ((r = writen(connFd, &n_stored_files, sizeof(int))) < 0) { //Dico al client quanti file invierò
-                    perror("writen");
+                    perror("writenReadN1");
                     break;     
             }
             if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //Operazione andata a buon fine, invio feedback positivo
@@ -267,7 +265,7 @@ void threadWorker(void *arg) {
         }
         else { //deve inviare gli N files richiesti
         if ((r = writen(connFd, &n_of_files, sizeof(int))) < 0) { //Dico al client quanti file invierò
-                    perror("writen");
+                    perror("writenReadN2");
                     break;     
             }
             if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //File letti correttamente
@@ -286,7 +284,7 @@ void threadWorker(void *arg) {
             }
             if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
                 printf("HO APPESO\n");
-                //icl_hash_dump_2(stdout, hTable);
+                icl_hash_dump_2(stdout, hTable);
                 int fb = SUCCESS;
                 if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback append");
@@ -305,6 +303,7 @@ void threadWorker(void *arg) {
             break;
         case CLOSEFILE:
                 if (delete_by_key(&open_file, client_op.pathname) == 0) { //File chiuso correttamente 
+                    print_q(open_file);
                     int fb = SUCCESS;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback closeFile");
@@ -369,34 +368,42 @@ int main (int argc, char **argv) {
 
     /*Debug inserimento file server*/
     //printf("SIZE: %ld\n", sizeof(hTable)/MB);
-    insert_file(&file_list, "pippo");
+    /*insert_file(&file_list, "pippo");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/gianni");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/minnie");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/giannis");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/minnies");
     print_q(file_list);
     printf("FILE IN CODA: %s\n", get_last_file(file_list));
-    print_q(file_list);
-    hTable = icl_hash_create(5, NULL, NULL, 100, 5);
-    if (check_numOfFiles_FIFO() != 0) {
-        icl_hash_insert(hTable, "pippo", "prova contenuto");
-    }
-    if (check_numOfFiles_FIFO() != 0) {
-        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/gianni", "contenuto incredibile");
-    }
-    if (check_numOfFiles_FIFO() != 0) {
-        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnie", "questo è un contenuto fantastico");
-    }
-    if (check_numOfFiles_FIFO() != 0) {
-        icl_hash_insert(hTable, "pippos", "prova contenuto");
-    }
-    if (check_numOfFiles_FIFO() != 0) {
-        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/giannis", "contenuto incredibile");
-    }
-    check_memory_FIFO(34);
-    icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnies", "questo è un contenuto fantastico");
+    print_q(file_list);*/
+    hTable = icl_hash_create(100, NULL, NULL, 100000, 100);
+    char *file_pippo = strdup("wow che contenuto");
+    char *file_gianni = strdup("no vabbè");
+    char *file_minnie = strdup("sempre meglio");
+    char *file_pippos = strdup("ancora più bello");
+    char *file_giannis = strdup("fantastico");
 
-    icl_hash_dump_2(stdout, hTable);
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "pippo", (void*)file_pippo);
+    }
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/gianni", (void*)file_gianni);
+    }
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnie", (void*)file_minnie);
+    }
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "pippos", (void*)file_pippos);
+    }
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/giannis", (void*)file_giannis);
+    }
+    //check_memory_FIFO(34);
+    //icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnies", "questo è un contenuto fantastico");
+
+    //put_by_key(&open_file, "pippo", 5);
+
+    //icl_hash_dump_2(stdout, hTable);
     /*insert_by_key(open_file, "albertino", 5);
     insert_by_key(open_file, "pippo", 5);
     insert_by_key(open_file, "gianni", 5);

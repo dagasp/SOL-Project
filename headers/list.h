@@ -4,7 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
+#include "util.h"
 
 enum STATUS {
   OPEN = 0, 
@@ -12,7 +12,7 @@ enum STATUS {
 };
 
 typedef struct node {
-    char pathname[PATH_MAX];
+    char pathname[MAX_PATH];
     int descriptor;
     int curr_size;
     int file_status;

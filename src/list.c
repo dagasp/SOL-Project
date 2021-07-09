@@ -12,16 +12,17 @@ void put_by_key(list **head, const char *key, int desc) {
     *head = tmp;
 }
 
-int delete_by_key(list **head, char *k) {
+int delete_by_key(list **head, char *k, int desc) {
     list *tmp = *head;
     list *prev = NULL;
+    if (*head == NULL || head == NULL) return 0;
     while (tmp != NULL) {
        // printf("QUEUE DATA: %s\n", (char*)tmp->data);
         //printf("KEY DATA: %s\n", (char*)k);
-        if (strncmp(tmp->pathname, k, MAX_PATH) == 0) {
+        if ((strncmp(tmp->pathname, k, MAX_PATH) == 0) && tmp->descriptor == desc) {
             if (prev == NULL) {
+                *head = (*head)->next;
                 free(tmp);
-                *head = NULL;
                 return 0;
             }
             else {
@@ -90,8 +91,8 @@ void delete_last_element(list **head) {
 
 void print_q(list *list) {
     while (list != NULL) {
-        printf("QUEUE DATA: %s\n", (char*)list->pathname);
-        printf("SOCKET ASSOCIATED: %d\n", list->descriptor);
+        printf("PATHNAME: %s\n", (char*)list->pathname);
+        printf("ASSOCIATED SOCKET: %d\n", list->descriptor);
         list = list->next;
     }
 }

@@ -25,7 +25,7 @@ void put_by_key (list **head, const char *key, int desc);
 int insert_file(list **head, char *path);
 char *get_last_file(list *l);
 void delete_last_element(list **head);
-int delete_by_key(list **head, char *k);
+int delete_by_key(list **head, char *k, int);
 
 void print_q(list *list);
 

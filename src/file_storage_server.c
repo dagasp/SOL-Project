@@ -102,9 +102,9 @@ int check_numOfFiles_FIFO() {
 }
 
 /*
-*Controlla che il file storage abbia spazio in memoria per un nuovo file, in caso contrario toglie il primo file inserito ricorsivamente
+*Controlla che il file storage abbia spazio in memoria per un nuovo file, in caso contrario toglie il primo file inserito, ricorsivamente,
 *fino a quando non c'è abbastanza spazio (FIFO)
-*new_size - il peso in byte del file da inserire
+*@param new_size - il peso in byte del file da inserire
 */
 
 void check_memory_FIFO(size_t new_size) {
@@ -133,15 +133,15 @@ void threadWorker(void *arg) {
     server_reply server_rep;        //Struct in risposta al client
     client_operations client_op;    //Struct che legge i messaggi inviati dal client
     msg msg;                        //Struct per la gestione dei messaggi
-    memset(&client_op, 0, sizeof(client_op));
-    memset(&server_rep, 0, sizeof(server_rep));
+    memset(&client_op, 0, sizeof(client_operations));
+    memset(&server_rep, 0, sizeof(server_reply));
     memset(&msg, 0, sizeof(msg));
 
-    if ((r = readn(connFd, (void*)&client_op, sizeof(client_op))) < 0) { //Leggo la richiesta
+    if ((r = readn(connFd, (void*)&client_op, sizeof(client_operations))) < 0) { //Leggo la richiesta
         fprintf(stderr, "Impossibile leggere dal client\n");
         return;
     }
-    else if (r == 0) { //Il client ha finito le richieste -- chiudo la connessione
+    if (r == 0) { //Il client ha finito le richieste -- chiudo la connessione
         close(connFd);
         return;
     }
@@ -205,6 +205,7 @@ void threadWorker(void *arg) {
                 else { //File esiste
                     printf("Trying to open the file...\n");
                     put_by_key(&open_file,client_op.pathname,client_op.client_desc); //Lo inserisco nella lista dei files aperti
+                    print_q(open_file);
                         printf("File aperto\n");
                         int fb = SUCCESS;
                         printf("FBFBFB %d\n", fb);
@@ -212,7 +213,6 @@ void threadWorker(void *arg) {
                             perror("writen");
                             break;
                         }      
-                    //} 
                 }
                 break;
             }
@@ -221,19 +221,20 @@ void threadWorker(void *arg) {
         if (msg.data == NULL) {
             fprintf(stderr, "Errore, file non trovato\n");
             server_rep.reply_code = FAILED; //-1
-            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
                 perror("writen");
                 break;
             }
             break;
         }
         if (list_contain_file(open_file, client_op.pathname, client_op.client_desc) == 0) { //Se il file è nella lista dei file aperti da quel client, lo copio
+            //print_q(open_file);
             printf("File is open - SUCCESS\n");
             msg.size = strnlen(msg.data, MAX_FILE_SIZE);
             printf("MSG SIZE IS: %ld\n", msg.size);
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size);
-            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
                 perror("writen");
                 break;
             }
@@ -241,7 +242,7 @@ void threadWorker(void *arg) {
         else { //Il file non era in lista, non è stato aperto, non è stato possibile leggerlo
             printf("File is closed - FAILED\n");
             server_rep.reply_code = FAILED;
-            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_rep))) < 0) {
+            if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
                 perror("writen");
                 break;
             }
@@ -302,19 +303,12 @@ void threadWorker(void *arg) {
             }
             break;
         case CLOSEFILE:
-                if (delete_by_key(&open_file, client_op.pathname) == 0) { //File chiuso correttamente 
+                if (delete_by_key(&open_file, client_op.pathname, client_op.client_desc) == 0) { //File chiuso correttamente 
                     print_q(open_file);
                     int fb = SUCCESS;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback closeFile");
                             break;
-                    }
-                    else { //Non sono riuscito a chiudere il file
-                        int fb = FAILED;
-                        if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
-                            perror("writen negative feedback closeFile");
-                            break;
-                        } 
                     }
                 } 
                 else {
@@ -375,6 +369,7 @@ int main (int argc, char **argv) {
     insert_file(&file_list, "/mnt/c/Users/davyx/files/minnies");
     print_q(file_list);
     printf("FILE IN CODA: %s\n", get_last_file(file_list));
+    delete_by_key(&file_list, "/mnt/c/Users/davyx/files/minnies");
     print_q(file_list);*/
     hTable = icl_hash_create(100, NULL, NULL, 100000, 100);
     char *file_pippo = strdup("wow che contenuto");

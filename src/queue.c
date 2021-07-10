@@ -40,3 +40,13 @@ void dequeue (fqueue *queue) {
     queue->head = head->next;
     free (head);
 }
+
+void delete_queue(fqueue *q) {
+    while (q->head != q->tail) {
+        node *to_free = q->head->data;
+        q->head = q->head->next;
+        free(to_free);
+    }
+    if (q->head) free (q->head);
+    free(q);
+}

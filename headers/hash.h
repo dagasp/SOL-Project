@@ -11,6 +11,7 @@
 #define icl_hash_h
 #define _GNU_SOURCE  
 #include <stdio.h>
+#include <pthread.h>
 #include "util.h"
 #include "api.h"
 #include "list.h"
@@ -33,6 +34,7 @@ typedef struct icl_hash_s {
     size_t curr_size;
     long max_files;
     icl_entry_t **buckets;
+    pthread_mutex_t tableLock;
     unsigned int (*hash_function)(void*);
     int (*hash_key_compare)(void*, void*);
 } icl_hash_t;
@@ -47,8 +49,7 @@ int
 icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append);
 
 icl_entry_t
-* icl_hash_insert(icl_hash_t *, void*, void *),
-    * icl_hash_update_insert(icl_hash_t *, void*, void *, void**);
+* icl_hash_insert(icl_hash_t *, void*, void *);
 
 int
 icl_hash_destroy(icl_hash_t *, void (*)(void*), void (*)(void*)),
@@ -66,16 +67,10 @@ hash_pjw(void* key);
 int 
 string_compare(void* a, void* b);
 
-/* Funzioni aggiunte*/
+
 int get_n_entries (icl_hash_t *);
 
-
-
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size);
-
-/*Fine funzioni aggiunte*/
-
-//void get_file(icl_hash_t *t, char pathname[][], char content[][]);
 
 #define icl_hash_foreach(ht, tmpint, tmpent, kp, dp)    \
     for (tmpint=0;tmpint<ht->nbuckets; tmpint++)        \

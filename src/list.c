@@ -50,6 +50,7 @@ int list_contain_file(list *l, char *path, int desc) {
 
 int insert_file(list **head, char *path) {
     list *curr;
+    if (!path) return -1;
     for (curr=*head; curr != NULL; curr=curr->next)
         if (strncmp(curr->pathname, path, MAX_PATH) == 0)
             return -1; /* File esiste già */
@@ -64,6 +65,26 @@ int insert_file(list **head, char *path) {
     tmp->next = *head;
     *head = tmp;
     return 0;
+}
+
+void insert_tail(list **head, char *path) {
+    list *curr = *head;
+    list *tmp = malloc(sizeof(list));
+    if (!tmp) {
+        fprintf(stderr, "Errore nella malloc\n");
+        return;
+    }
+    strncpy(tmp->pathname, path, MAX_PATH);
+    tmp->next = NULL;
+    if (*head == NULL) {
+        *head = tmp;
+        return;
+    }
+    while (curr->next != NULL) {
+        curr = curr->next;
+    }
+    curr->next = tmp;
+    return;
 }
 
 char *get_last_file(list *l) {
@@ -92,7 +113,18 @@ void delete_last_element(list **head) {
 void print_q(list *list) {
     while (list != NULL) {
         printf("PATHNAME: %s\n", (char*)list->pathname);
-        printf("ASSOCIATED SOCKET: %d\n", list->descriptor);
+        //printf("ASSOCIATED SOCKET: %d\n", list->descriptor);
         list = list->next;
     }
+}
+
+void list_destroy(list **head) {
+    list *curr = *head;
+    list *next = NULL;
+    while (curr != NULL) {
+        next = curr->next;
+        free(curr);
+        curr = next;
+    }
+    *head = NULL;
 }

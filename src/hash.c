@@ -91,11 +91,13 @@ icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_
     ht->nbuckets = nbuckets;
     for(i=0;i<ht->nbuckets;i++)
         ht->buckets[i] = NULL;
-    //ht->max_size = memory_size;
-    //ht->max_files = max_files;
     ht->hash_function = hash_function ? hash_function : hash_pjw;
     ht->hash_key_compare = hash_key_compare ? hash_key_compare : string_compare;
     ht->curr_size = 0;
+    if (pthread_mutex_init(&ht->tableLock, NULL) != 0) {
+        fprintf(stderr, "Errore nell'inizializzazione della lock\n");
+        return NULL;
+    }
     ht->max_size = maxSize;
     ht->max_files = maxFiles;
     return ht;
@@ -137,13 +139,13 @@ icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append)
     if (!data_to_append) return -1;
 
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
-
+    LOCK(&ht->tableLock);
     for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
         if ( ht->hash_key_compare(curr->key, key)) {
             free(curr->data); //Libero la vecchia memoria
             curr->data = data_to_append; //Aggiorno il puntatore
         }
-
+    UNLOCK(&ht->tableLock);
     return 0;
 }
 
@@ -161,7 +163,7 @@ icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append)
 int append (icl_hash_t *ht, void *key, char *new_data, size_t size) { 
     if (!ht || !key) return -1;
     if (!new_data) return -1;
-    char *data = icl_hash_find(ht, key);
+    char *data = (char*)icl_hash_find(ht, key);
     if (!data) {
         return -1;
     }
@@ -203,12 +205,16 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     }
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
 
+    LOCK(&ht->tableLock);
     for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
         if ( ht->hash_key_compare(curr->key, key))
             return(NULL); /* key already exists */
     
     /*Superata la memoria*/
-    if (len_of_data > ht->max_size) return NULL; //Se il file è più grande della capienza massima della tabella, non lo inserisco
+    if (len_of_data > ht->max_size) {
+        fprintf(stderr, "Errore - file troppo grande per la memoria dello storage\n"); //Se il file è più grande della capienza massima della tabella, non lo inserisco
+        return NULL;
+    }                                                                                   
 
     /* if key was not found */
     curr = (icl_entry_t*)malloc(sizeof(icl_entry_t));
@@ -221,63 +227,9 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     ht->buckets[hash_val] = curr;
     ht->nentries++;
     ht->curr_size += len_of_data;
-    //printf("Curr size is %ld, Max size is %ld\n", ht->curr_size, ht->max_size);
+    UNLOCK(&ht->tableLock);
     return curr;
 }
-
-/**
- * Replace entry in hash table with the given entry.
- *
- * @param ht -- the hash table
- * @param key -- the key of the new item
- * @param data -- pointer to the new item's data
- * @param olddata -- pointer to the old item's data (set upon return)
- *
- * @returns pointer to the new item.  Returns NULL on error.
- */
-
-icl_entry_t *
-icl_hash_update_insert(icl_hash_t *ht, void* key, void *data, void **olddata)
-{
-    icl_entry_t *curr, *prev;
-    unsigned int hash_val;
-
-    if(!ht || !key) return NULL;
-
-    hash_val = (* ht->hash_function)(key) % ht->nbuckets;
-
-    /* Scan bucket[hash_val] for key */
-    for (prev=NULL,curr=ht->buckets[hash_val]; curr != NULL; prev=curr, curr=curr->next)
-        /* If key found, remove node from list, free old key, and setup olddata for the return */
-        if ( ht->hash_key_compare(curr->key, key)) {
-            if (olddata != NULL) {
-                *olddata = curr->data;
-                free(curr->key);
-            }
-
-            if (prev == NULL)
-                ht->buckets[hash_val] = curr->next;
-            else
-                prev->next = curr->next;
-        }
-
-    /* Since key was either not found, or found-and-removed, create and prepend new node */
-    curr = (icl_entry_t*)malloc(sizeof(icl_entry_t));
-    if(curr == NULL) return NULL; /* out of memory */
-
-    curr->key = key;
-    curr->data = data;
-    curr->next = ht->buckets[hash_val]; /* add at start */
-
-    ht->buckets[hash_val] = curr;
-    ht->nentries++;
-
-    if(olddata!=NULL && *olddata!=NULL)
-        *olddata = NULL;
-
-    return curr;
-}
-
 
 /**
  * Free one hash table entry located by key (key and data are freed using functions).
@@ -298,6 +250,7 @@ int icl_hash_delete(icl_hash_t *ht, void* key, void (*free_key)(void*), void (*f
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
 
     prev = NULL;
+    LOCK(&ht->tableLock);
     for (curr=ht->buckets[hash_val]; curr != NULL; )  {
         if ( ht->hash_key_compare(curr->key, key)) {
             if (prev == NULL) {
@@ -309,15 +262,17 @@ int icl_hash_delete(icl_hash_t *ht, void* key, void (*free_key)(void*), void (*f
             if (*free_data && curr->data) {
                 size_t old_size = strlen((char*)curr->data); //Peso in byte del file che sto per eliminare
                 (*free_data)(curr->data);
-                ht->curr_size -= old_size; //Diminuisco l'attuale memoria utilizzata di 'old_size' byte
+                ht->curr_size = ht->curr_size - old_size; //Diminuisco l'attuale memoria utilizzata di 'old_size' byte
             } 
             ht->nentries--;
             free(curr);
+            UNLOCK(&ht->tableLock);
             return 0;
         }
         prev = curr;
         curr = curr->next;
     }
+    UNLOCK(&ht->tableLock);
     return -1;
 }
 
@@ -344,7 +299,6 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
             next=curr->next;
             if (*free_key && curr->key) (*free_key)(curr->key);
             if (*free_data && curr->data) {
-                if (curr->modified == 1) //Se ho fatto l'append al file libero la memoria
                     (*free_data)(curr->data);
             }
             free(curr);
@@ -383,11 +337,11 @@ icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
             if(curr->key && file_readed <= n_of_files) {
                 strcpy(server_rep.pathname, (char*)curr->key);
                 strcpy(server_rep.data, (char*)curr->data);
-                if (writen(connFd, &server_rep, sizeof(server_rep)) < 0) {
+                if (writen(connFd, &server_rep, sizeof(server_reply)) < 0) {
                     perror("writenDump");
                     return -1;
                 }
-                memset(&server_rep, 0, sizeof(server_rep));
+                memset(&server_rep, 0, sizeof(server_reply));
                 file_readed++;
             }
             curr=curr->next;

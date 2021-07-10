@@ -25,4 +25,6 @@ node *pop(fqueue *queue);
 
 void dequeue (fqueue *queue);
 
+void delete_queue(fqueue *q);
+
 #endif

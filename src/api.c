@@ -6,6 +6,11 @@ static int fd_skt;
 Ritorna 0 in caso di successo, -1 in caso di errore.*/
 
 int writeToFile(char *pathname, char *content, const char *dirname) {
+    if (!pathname) {
+        fprintf(stderr, "writeToFile: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     //char *tmp_dirname = calloc(sizeof(char), MAX_PATH);
      //Controllo che la cartella esista
     char *tmp_dirname = get_path(dirname); //Prendo path assoluto, se esiste
@@ -51,10 +56,10 @@ int openConnection(const char *sockname, int msec, const struct timespec abstime
         sleep(msec * 1000);
         SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     }
+    errno = ETIMEDOUT;
     if (r != -1)
         return 0;
     return r;
-    //settare errno;
 }
 
 /*Richiesta di apertura o di creazione di un file. La semantica della openFile dipende dai flags passati come secondo
@@ -70,6 +75,11 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 
 int openFile(const char *pathname, int flags) {
     //printf("OPEN FILE\n");
+    if (!pathname) {
+        fprintf(stderr, "openFile: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     client_operations client_op;
     memset(&client_op, 0, sizeof(client_operations));
     client_op.flags = flags;
@@ -93,6 +103,11 @@ settato opportunamente.
 */
 
 int readFile(const char* pathname, void** buf, size_t* size) {
+    if (!pathname) {
+        fprintf(stderr, "readFile: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     int n;
     client_operations client_op;
     server_reply server_rep;
@@ -165,11 +180,26 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 */
 
 int appendToFile(const char *pathname, void *buf, size_t size, const char *dirname) {
+    if (!pathname) {
+        fprintf(stderr, "appendToFile: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
+    if (!buf) {
+        fprintf(stderr, "appendToFile: Contenuto da appendere non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     client_operations client_op;
+    server_reply server_rep;
     memset(&client_op, 0, sizeof(client_operations));
+    memset(&server_rep, 0, sizeof(server_reply));
     client_op.op_code = APPENDTOFILE;
     client_op.size = size;
     client_op.client_desc = fd_skt;
+    if (dirname) //Devo salvare i file eventualmente espulsi, lo dico al server
+        client_op.flags = 1;
+    else client_op.flags = 0;
     strcpy(client_op.pathname, pathname);
     memcpy(client_op.data, buf, size);
     int n, fb;
@@ -182,6 +212,11 @@ int appendToFile(const char *pathname, void *buf, size_t size, const char *dirna
 Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opportunamente.
 */
 int closeFile(const char *pathname) {
+    if (!pathname) {
+        fprintf(stderr, "closeFile: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     client_operations client_op;
     memset(&client_op, 0, sizeof(client_operations));
     client_op.op_code = CLOSEFILE;
@@ -197,6 +232,11 @@ int closeFile(const char *pathname) {
 fallimento, errno viene settato opportunamente.*/
 
 int closeConnection(const char *sockname) {
+    if (!sockname) {
+        fprintf(stderr, "closeConnection: Pathname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     //client_operations client_op;
     //memset(&client_op, 0, sizeof(client_op));
     //client_op.op_code = CLOSECONNECTION;

@@ -51,7 +51,6 @@ char ** tokenize_args(char *args, unsigned int *hM) {
         token = strtok(NULL, ",");
         i++;
     }
-    //*(arg + index) = 0;
     return arg;
 }
 
@@ -105,11 +104,11 @@ void send_request () {
             
             /*Debug Append*/
 
-            /*char *append = "Incredibile prova di append, fantastica";
-            if (appendToFile("pippo", (void*)append, 40, "boh") == 0)
+            char *append = "Incredibile prova di append, fantastica";
+            if (appendToFile("pippo", (void*)append, 40, "files") == 0)
                 printf("Agg appis\n");
             else
-                printf("Impossibile appendere\n");*/
+                printf("Impossibile appendere\n");
             if (dFlag != 0) {
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
                     fprintf(stderr, "Non è stato possibile scrivere sui files\n");
@@ -146,6 +145,8 @@ void send_request () {
 }
 
 int main(int argc, char **argv) {
+    char **to_do = NULL;
+    int to_free = 0;
     queue = create();
     long n_files = 0;
      if (argc == 1) {
@@ -167,11 +168,10 @@ int main(int argc, char **argv) {
                 break;
             }
             case 'r': {
-                char **to_do = NULL;
                 unsigned int how_many;
                 to_do = tokenize_args(optarg, &how_many);
                 int i = 0;
-                //int to_free = how_many;
+                to_free = how_many;
                 while (how_many > 0) {
                     insert(queue, 'r', (void*)to_do[i]);
                     i++;
@@ -186,7 +186,6 @@ int main(int argc, char **argv) {
                     i++;
                     to_free--;
                 }*/
-                free(to_do);
                 break;
             }
             case 'R': {
@@ -253,6 +252,15 @@ int main(int argc, char **argv) {
     }
     else 
         printf("closeConnection: Impossibile chiudere la connessione\n");
+    int i = 0;
+    
+    /*Clean della memoria occupata dall'array di stringhe usato per il parsing degli argomenti*/
+    while (to_free > 0) {
+        free(to_do[i]);
+         i++;
+        to_free--;
+    }
+    free(to_do);
     free(config);
     free(queue);
     return 0;

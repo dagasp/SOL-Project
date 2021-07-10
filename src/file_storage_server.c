@@ -32,12 +32,15 @@ typedef struct {
 static config_file *conf;
 
 
-//Hash table dei file e la sua mutex
+//Hash table dei file e la sua lock
 static icl_hash_t *hTable = NULL; 
-pthread_mutex_t files = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t filesTable = PTHREAD_MUTEX_INITIALIZER;
 
 list *open_file; //Lista dei file aperti da tutti i client
+pthread_mutex_t openFileLock = PTHREAD_MUTEX_INITIALIZER;
+
 list *file_list; //Lista di tutti i file
+pthread_mutex_t fileListLock = PTHREAD_MUTEX_INITIALIZER;
 
 //Pool di threadpool
 threadpool_t *pool = NULL;
@@ -45,34 +48,6 @@ threadpool_t *pool = NULL;
 //Set 
 fd_set set, tmpset;
 
-
-
-// funzione eseguita dal signal handler thread
-static void *sigHandler(void *arg) {
-    sigset_t *set = ((sigHandler_t*)arg)->set;
-    int fd_pipe   = ((sigHandler_t*)arg)->signal_pipe;
-
-    for( ;; ) {
-	int sig;
-	int r = sigwait(set, &sig);
-	if (r != 0) {
-	    errno = r;
-	    perror("FATAL ERROR 'sigwait'");
-	    return NULL;
-	}
-
-	switch(sig) {
-	case SIGINT:
-	case SIGTERM:
-	case SIGQUIT:
-	    //printf("ricevuto segnale %s, esco\n", (sig==SIGINT) ? "SIGINT": ((sig==SIGTERM)?"SIGTERM":"SIGQUIT") );
-	    close(fd_pipe);  // notifico il listener thread della ricezione del segnale
-	    return NULL;
-	default:  ; 
-	}
-    }
-    return NULL;	   
-}
 
 //Funzione per aggiornare il massimo dei descrittori nel set
 int updatemax(fd_set set, int fdmax) {
@@ -90,11 +65,13 @@ int updatemax(fd_set set, int fdmax) {
 int check_numOfFiles_FIFO() { 
     if (hTable->nentries + 1 > hTable->max_files) { //Devo eliminare un file
         printf("Ho raggiunto il massimo numero di file, elimino il primo inserito\n");
+        LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list); //Prendo il primo inserito - FIFO
         if (!to_delete) return -1;
         if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
             printf("File eliminato correttamente dalla tabella\n");
             delete_last_element(&file_list);
+            UNLOCK(&fileListLock);
             return 0;
         }
     }
@@ -104,21 +81,28 @@ int check_numOfFiles_FIFO() {
 /*
 *Controlla che il file storage abbia spazio in memoria per un nuovo file, in caso contrario toglie il primo file inserito, ricorsivamente,
 *fino a quando non c'è abbastanza spazio (FIFO)
+*Valore di ritorno: il numero di file eliminati
 *@param new_size - il peso in byte del file da inserire
 */
 
-void check_memory_FIFO(size_t new_size) {
-    if (new_size == 0) return; //Se il file da inserire è vuoto, esco per inserirlo subito
-    if (hTable->curr_size + new_size > hTable->max_size) { //Memoria superata-> ho bisogno di liberare spazio
+static int how_many = 0;
+int check_memory_FIFO(size_t new_size) {
+    if (new_size == 0) return 0; //Se il file da inserire è vuoto, esco per inserirlo subito
+    if (new_size > hTable->max_size) return -1;
+    if (hTable->curr_size + new_size > hTable->max_size && hTable->nentries > 0) { //Memoria superata-> ho bisogno di liberare spazio
         printf("Ho raggiunto la dimensione massima della memoria, elimino il primo file inserito\n");
+        LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list);
-        if (!to_delete) return;
+        if (!to_delete) return -1;
         if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
             printf("File eliminato correttamente\n");
+            how_many++;
             delete_last_element(&file_list); 
-        } 
+        }
+        UNLOCK(&fileListLock); 
         check_memory_FIFO(new_size);  
     }
+    return how_many;
 }
 
 //WorkerFunction eseguita dal main thread
@@ -126,7 +110,6 @@ void threadWorker(void *arg) {
     assert(arg);
     long* args = (long*)arg;
     long connFd = args[0]; //Descrittore del socket
-    //long* termina = (long*)(args[1]);
 	int req_pipe = (int) args[1]; //Pipe di comunicazione col main thread
     free(arg);
     int r;
@@ -145,15 +128,15 @@ void threadWorker(void *arg) {
         close(connFd);
         return;
     }
-    printf("OP CODE RICEVUTO DAL SERVER: %d\n", client_op.op_code);
-    printf("PATHNAME RICEVUTO: %s\n", client_op.pathname);
+    //printf("OP CODE RICEVUTO DAL SERVER: %d\n", client_op.op_code);
+    //printf("PATHNAME RICEVUTO: %s\n", client_op.pathname);
     int op_code = client_op.op_code;
     switch (op_code) {
      case OPENFILE: //AGGIUNGERE O_CREATE IN OR CON O_LOCK
         //printf("FLAGS: %d\n", client_op.flags);
            if (client_op.flags == O_CREATE) {
                 if (icl_hash_find(hTable, (void*) client_op.pathname) != NULL) { // != NULL -> file esiste
-                    printf("File esiste + OCREATE\n");
+                    //printf("File esiste + OCREATE\n");
                     int feedback = FAILED;
                     if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
                         perror("writen");
@@ -164,9 +147,14 @@ void threadWorker(void *arg) {
                 else { //Creo il file
                     if (icl_hash_insert(hTable, client_op.pathname, client_op.data) != NULL) {
                         printf("File creato correttamente\n");
-                        if (insert_file(&file_list, client_op.pathname) != 0)
+                        LOCK(&fileListLock);
+                        if (insert_file(&file_list, client_op.pathname) != 0) //Metto il file nella lista di tutti i file 
                             printf("File già presente in coda, non inserito\n");
                         else printf("File inserito anche in coda\n");
+                        UNLOCK(&fileListLock);
+                        LOCK(&openFileLock);
+                        put_by_key(&open_file, client_op.pathname, client_op.client_desc); //Metto il file nella lista dei file aperti da quel descrittore
+                        UNLOCK(&openFileLock);
                         int feedback = SUCCESS;
                         if ((r = writen(connFd, &feedback, sizeof(int))) < 0) {
                             perror("writen");
@@ -204,8 +192,10 @@ void threadWorker(void *arg) {
                 } 
                 else { //File esiste
                     printf("Trying to open the file...\n");
+                    LOCK(&openFileLock);
                     put_by_key(&open_file,client_op.pathname,client_op.client_desc); //Lo inserisco nella lista dei files aperti
-                    print_q(open_file);
+                    UNLOCK(&openFileLock);
+                    //print_q(open_file);
                         printf("File aperto\n");
                         int fb = SUCCESS;
                         printf("FBFBFB %d\n", fb);
@@ -227,8 +217,10 @@ void threadWorker(void *arg) {
             }
             break;
         }
+        LOCK(&openFileLock);
         if (list_contain_file(open_file, client_op.pathname, client_op.client_desc) == 0) { //Se il file è nella lista dei file aperti da quel client, lo copio
             //print_q(open_file);
+            UNLOCK(&openFileLock);
             printf("File is open - SUCCESS\n");
             msg.size = strnlen(msg.data, MAX_FILE_SIZE);
             printf("MSG SIZE IS: %ld\n", msg.size);
@@ -240,6 +232,7 @@ void threadWorker(void *arg) {
             }
         }
         else { //Il file non era in lista, non è stato aperto, non è stato possibile leggerlo
+            UNLOCK(&openFileLock);
             printf("File is closed - FAILED\n");
             server_rep.reply_code = FAILED;
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
@@ -279,32 +272,38 @@ void threadWorker(void *arg) {
             break;
         case APPENDTOFILE:
        // icl_hash_dump_2(stdout, hTable);
+            LOCK(&openFileLock);
             if (list_contain_file(open_file, client_op.pathname, client_op.client_desc) != 0) { //File non aperto dal client
                 fprintf(stderr, "File non aperto, impossibile effettuare l'append\n");
+                UNLOCK(&openFileLock);
                 break;
             }
-            if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
-                printf("HO APPESO\n");
-                icl_hash_dump_2(stdout, hTable);
-                int fb = SUCCESS;
-                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+            UNLOCK(&openFileLock);
+            check_memory_FIFO(client_op.size);
+            //icl_hash_dump_2(stdout, hTable);
+                if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
+                    printf("HO APPESO\n");
+                    icl_hash_dump_2(stdout, hTable);
+                    int fb = SUCCESS;
+                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback append");
                             break;
                         }  
             }
-            else {
-                int fb = FAILED;
-                printf("NON HO APPESO\n");
-                //icl_hash_dump_2(stdout, hTable);
-                if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
+                else {
+                    int fb = FAILED;
+                    printf("NON HO APPESO\n");
+                    //icl_hash_dump_2(stdout, hTable);
+                    if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen negative feedback append");
                             break;
-                }  
-            }
+                    }  
+                } 
             break;
         case CLOSEFILE:
+                LOCK(&openFileLock);
                 if (delete_by_key(&open_file, client_op.pathname, client_op.client_desc) == 0) { //File chiuso correttamente 
-                    print_q(open_file);
+                    UNLOCK(&openFileLock);
                     int fb = SUCCESS;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback closeFile");
@@ -312,6 +311,7 @@ void threadWorker(void *arg) {
                     }
                 } 
                 else {
+                    UNLOCK(&openFileLock);
                     int fb = FAILED;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen negative feedback closeFile");
@@ -343,10 +343,42 @@ void destroy_everything(int force) {
     icl_hash_destroy(hTable, NULL, free);
     destroyThreadPool(pool, force);  // notifico che i thread dovranno uscire
     unlink(conf->sock_name);
-    free(open_file);
+    list_destroy(&file_list);
+    list_destroy(&open_file);
     free(conf);
 }
 
+// SigHandler Thread
+static void *sigHandler(void *arg) {
+    sigset_t *set = ((sigHandler_t*)arg)->set;
+    int fd_pipe   = ((sigHandler_t*)arg)->signal_pipe;
+
+    for( ;; ) {
+	    int sig;
+	    int r = sigwait(set, &sig);
+	    if (r != 0) {
+	        errno = r;
+	        perror("FATAL ERROR 'sigwait'");
+	        return NULL;
+	    }
+
+	    switch(sig) {
+	        case SIGINT:
+	        case SIGQUIT:
+                printf("Ricevuto segnale %s, avvio chiusura immediata\n", (sig==SIGINT) ? "SIGINT" : "SIGQUIT");
+                destroy_everything(1); //Con '1' termina subito e non accetta nuove richieste
+                close(fd_pipe);
+                pthread_exit(NULL);
+	        case SIGHUP:
+	            printf("Ricevuto segnale %s, aspetto i thread attivi e termino\n", "SIGHUP");
+                destroy_everything(0); //Con '0' aspetta i thread pendenti e poi termina (Non accetta nuove connessioni)
+	            close(fd_pipe);  // notifico il listener thread della ricezione del segnale
+                pthread_exit(NULL);
+	default:  ; 
+	    }
+    }
+    pthread_exit(NULL);	   
+}
 
 int main (int argc, char **argv) {
     //Lettura dei parametri dal file di configurazione
@@ -362,16 +394,20 @@ int main (int argc, char **argv) {
 
     /*Debug inserimento file server*/
     //printf("SIZE: %ld\n", sizeof(hTable)/MB);
-    /*insert_file(&file_list, "pippo");
+    insert_file(&file_list, "pippo");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/gianni");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/minnie");
+    insert_file(&file_list, "pippos");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/giannis");
-    insert_file(&file_list, "/mnt/c/Users/davyx/files/minnies");
-    print_q(file_list);
+    //insert_tail(&file_list, "Ultimo");
+    //print_q(file_list);
+    //delete_last_element(&file_list);
+    //print_q(file_list);
+    /*print_q(file_list);
     printf("FILE IN CODA: %s\n", get_last_file(file_list));
     delete_by_key(&file_list, "/mnt/c/Users/davyx/files/minnies");
     print_q(file_list);*/
-    hTable = icl_hash_create(100, NULL, NULL, 100000, 100);
+    hTable = icl_hash_create(conf->num_of_files, NULL, NULL, conf->memory_space, conf->num_of_files);
     char *file_pippo = strdup("wow che contenuto");
     char *file_gianni = strdup("no vabbè");
     char *file_minnie = strdup("sempre meglio");
@@ -393,6 +429,7 @@ int main (int argc, char **argv) {
     if (check_numOfFiles_FIFO() != 0) {
         icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/giannis", (void*)file_giannis);
     }
+    //printf("%s\n",get_last_file(file_list));
     //check_memory_FIFO(34);
     //icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/minnies", "questo è un contenuto fantastico");
 
@@ -421,6 +458,7 @@ int main (int argc, char **argv) {
     sigaddset(&mask, SIGQUIT);
     sigaddset(&mask, SIGHUP);
     
+    //Applico la maschera
     if (pthread_sigmask(SIG_BLOCK, &mask,NULL) != 0) {
 	    fprintf(stderr, "FATAL ERROR\n");
         exit(EXIT_FAILURE);
@@ -431,7 +469,8 @@ int main (int argc, char **argv) {
     s.sa_handler=SIG_IGN;
     if ((sigaction(SIGPIPE,&s,NULL)) == -1) {   
 	    perror("sigaction");
-	    goto _exit;
+	    destroy_everything(1);
+        return -1;
     } 
 
     /*
@@ -442,28 +481,36 @@ int main (int argc, char **argv) {
     int signal_pipe[2];
     if (pipe(signal_pipe)==-1) {
 		perror("signal pipe");
-		goto _exit;
-    	}
+		destroy_everything(1);
+        return -1;
+    }
 
     //Pipe di notifica di una richiesta che è stata servita e il thread è di nuovo pronto per altre richieste
 	int pipe_request[2];
 	if (pipe(pipe_request) == -1) {
-		perror("pipe request");
-		goto _exit;
+		destroy_everything(1);
+        return -1;
 	}
+    
+    /*Thread di gestione dei segnali*/
     pthread_t sighandler_thread;
     sigHandler_t handlerArgs = { &mask, signal_pipe[1] };
    
     if (pthread_create(&sighandler_thread, NULL, sigHandler, &handlerArgs) != 0) {
-		fprintf(stderr, "errore nella creazione del signal handler thread\n");
-		goto _exit;
+		fprintf(stderr, "Errore nella creazione del signal handler thread\n");
+		destroy_everything(1);
+        return -1;
     }
     
     int listenfd;
     if ((listenfd= socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
 		perror("socket");
-		goto _exit;
+        destroy_everything(1);
+		pthread_join(sighandler_thread, NULL);
+        return -1;
     }
+
+    /*Inizializzazione socket*/
 
     struct sockaddr_un serv_addr;
     memset(&serv_addr, '0', sizeof(serv_addr));
@@ -471,88 +518,98 @@ int main (int argc, char **argv) {
     strncpy(serv_addr.sun_path, conf->sock_name, strlen(conf->sock_name)+1);
 
     if (bind(listenfd, (struct sockaddr*)&serv_addr,sizeof(serv_addr)) == -1) {
-	    perror("bind");
-	    goto _exit;
+	    destroy_everything(1);
+		pthread_join(sighandler_thread, NULL);
+        return -1;
     }
     if (listen(listenfd, MAXBACKLOG) == -1) {
-	    perror("listen");
-	    goto _exit;
+	    destroy_everything(1);
+		pthread_join(sighandler_thread, NULL);
+        return -1;
     }
 
-    pool   = createThreadPool(num_of_threads_in_pool, num_of_threads_in_pool); 
+    //Creazione di un nuovo threadPool
+    pool   = createThreadPool(num_of_threads_in_pool, num_of_threads_in_pool);
     if (!pool) {
-		fprintf(stderr, "ERRORE FATALE NELLA CREAZIONE DEL THREAD POOL\n");
-		goto _exit;
+		fprintf(stderr, "Errore nella creazione del threadPool\n");
+		destroy_everything(1);
+		pthread_join(sighandler_thread, NULL);
+        return -1;
     }
     
     FD_ZERO(&set);
     FD_ZERO(&tmpset);
 
-    FD_SET(listenfd, &set);        
+    FD_SET(listenfd, &set);        //descrittore del socket
     FD_SET(signal_pipe[0], &set);  // descrittore di lettura della signal_pipe
     FD_SET(pipe_request[0], &set); // descrittore di lettura della pipe_request
 
     // tengo traccia del file descriptor con id piu' grande
     int fdmax = (listenfd > signal_pipe[0]) ? listenfd : signal_pipe[0];
 
-    volatile long termina=0;
+    volatile long termina = 0;
     while(!termina) {
         tmpset = set;
 	// copio il set nella variabile temporanea per la select
 	if (select(fdmax+1, &tmpset, NULL, NULL, NULL) == -1) {
 	    perror("select");
-	    goto _exit;
+	    destroy_everything(1);
+		pthread_join(sighandler_thread, NULL);
+        return -1;
 	}
-	// cerchiamo di capire da quale fd abbiamo ricevuto una richiesta
+	// Ciclo sugli fd delle richieste per vedere quale è pronto
 	for(int i=0; i <= fdmax; i++) {
 	    if (FD_ISSET(i, &tmpset)) {
 		long connfd;
-		if (i == listenfd) { // e' una nuova richiesta di connessione 
+		if (i == listenfd) { // Nuova richiesta di connessione
 		    if ((connfd = accept(listenfd, (struct sockaddr*)NULL ,NULL)) == -1) {
-			perror("accept");
-			goto _exit;
+			    destroy_everything(1);
+		        pthread_join(sighandler_thread, NULL);
+                return -1;
 		    }
 			else
 				printf("Client connesso\n");
-			FD_SET(connfd, &set);
+			FD_SET(connfd, &set); //Aggiunto fd al set
 			if (connfd > fdmax)
 				fdmax = connfd;
 		}
-		else if (i == pipe_request[0]) { //Il thread ha servito 
+		else if (i == pipe_request[0]) { //La pipe di comunicazione col worker mi segnala che il thread worker ha servito 
 			int n;
 			long desc;
 			if ((n=readn(pipe_request[0], &desc, sizeof(long))) == -1) {
 				perror("read");
 				continue;
 			}
-			printf("ThreadWorker ha servito\n");
-			FD_SET(desc, &set);
+			//printf("ThreadWorker ha servito\n");
+			FD_SET(desc, &set); //Rimetto fd nel set
 			if (desc > fdmax)
 				fdmax = desc;
 		}
 
 		else if (i == signal_pipe[0]) {
-		    // ricevuto un segnale, esco ed inizio il protocollo di terminazione
+		    //La pipe mi segnala che ho ricevuto un segnale, esco ed inizio il protocollo di terminazione
 		    termina = 1;
 		    break;
 		}
-		else { //
+		else { //E' una richiesta da eseguire - la mando al thread worker
 			long* args = malloc(3*sizeof(long));
 		    if (!args) {
-		      perror("FATAL ERROR 'malloc'");
-		      goto _exit;
+		        perror("Errore nella malloc\n");
+		        destroy_everything(1);
+		        pthread_join(sighandler_thread, NULL);
+                return -1;
 		    }
 			args[0] = connfd;
-		    //args[1] = (long)&termina;
-			args[1] = (int) pipe_request[1];
-			FD_CLR(i, &set);
-			fdmax = updatemax(set, fdmax);
-		    int r =addToThreadPool(pool, threadWorker, (void*)args);
+			args[1] = (int) pipe_request[1]; //Pipe di comunicazione tra main thread e worker
+			FD_CLR(i, &set); //Tolgo il suo fd dal set (momentaneamente)
+			fdmax = updatemax(set, fdmax); //Aggiorno il massimo tra i descrittori
+		    int r = addToThreadPool(pool, threadWorker, (void*)args); //Invio task al threadPool
 		    if (r==0) continue; // aggiunto con successo
-		    if (r<0) { // errore interno
-			fprintf(stderr, "FATAL ERROR, adding to the thread pool\n");
-		    } else { // coda dei pendenti piena
-			fprintf(stderr, "SERVER TOO BUSY\n");
+		    if (r < 0) { //Fallimento
+			    fprintf(stderr, "Impossibile aggiungere al threadPool\n");
+		    } 
+            else { //Non ci sono thread disponibili
+			    fprintf(stderr, "Errore - nessun thread disponibile\n");
 		    }
 		    free(args);
 		   	close(connfd);
@@ -561,11 +618,7 @@ int main (int argc, char **argv) {
 	    }
 	}
     }
-    destroy_everything(0); //libererà la memoria aspettando che tutti i thread finiscano
+    //destroy_everything(0); //libererà la memoria aspettando che tutti i thread finiscano
     pthread_join(sighandler_thread, NULL);
     return 0;    
- _exit:
-    destroy_everything(1); //libererà la memoria forzando la chiusura di tutti i thread
-    pthread_join(sighandler_thread, NULL); 
-    return -1;
 }

@@ -30,12 +30,16 @@ libPool.a: threadpool.o ../headers/threadpool.h
 	$(AR) $(ARFLAGS) $@ $^
 
 #Libreria strutture dati
-libStruct.a: hash.o ../headers/hash.h queue.o ../headers/queue.h
+libStruct.a: hash.o ../headers/hash.h queue.o ../headers/queue.h list.o ../headers/list.h
 	$(AR) $(ARFLAGS) $@ $^
 
 #Libreria API
 libApi.a: api.o ../headers/api.h
 	$(AR) $(ARFLAGS) $@ $^
+
+test1: client file_storage_server
+
+test2: client file_storage_server
 
 file_storage_server.o: file_storage_server.c 
 
@@ -47,6 +51,8 @@ hash.o: hash.c
 
 queue.o: queue.c
 
+list.o: list.c
+
 api.o: api.c
 
 threadpool.o: threadpool.c 
@@ -54,4 +60,4 @@ threadpool.o: threadpool.c
 clean		: 
 	rm -f $(TARGETS)
 cleanall	: clean
-	\rm -f *.o *~ *.a ./cs_sock threadpool/*.o threadpool/*~
+	\rm -f *.o *~ *.a ./cs_sock src/*.o src/*~

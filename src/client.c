@@ -104,11 +104,11 @@ void send_request () {
             
             /*Debug Append*/
 
-            char *append = "Incredibile prova di append, fantastica";
+            /*char *append = "Incredibile prova di append, fantastica";
             if (appendToFile("pippo", (void*)append, 40, "files") == 0)
                 printf("Agg appis\n");
             else
-                printf("Impossibile appendere\n");
+                printf("Impossibile appendere\n");*/
             if (dFlag != 0) {
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
                     fprintf(stderr, "Non è stato possibile scrivere sui files\n");
@@ -244,8 +244,7 @@ int main(int argc, char **argv) {
     }
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request(); //Invio la richiesta
-        if (sleep_time != 0)
-            usleep(sleep_time);
+        usleep(sleep_time*1000);
     }
     if (closeConnection(sock_name) == 0) 
     {

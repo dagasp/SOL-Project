@@ -40,7 +40,7 @@ typedef struct client_operations {
     char pathname[MAX_PATH];
     char data[MAX_FILE_SIZE];
     char dirname [MAX_PATH];
-    int client_desc;
+    long client_desc;
     unsigned int op_code;
     int flags;
     int feedback;
@@ -72,7 +72,8 @@ int writeFile(const char *pathname, const char *dirname);
 
 int appendToFile(const char *pathname, void *buf, size_t size, const char *dirname);
 
-int closeFile(const char *pathname); 
+int closeFile(const char *pathname);
+
 int writeToFile(char *pathname, char *content, const char *dirname);
 
 #endif

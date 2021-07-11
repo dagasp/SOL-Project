@@ -67,12 +67,17 @@ int check_numOfFiles_FIFO() {
         LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list); //Prendo il primo inserito - FIFO
         if (!to_delete) return -1;
-        if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
-            printf("File eliminato correttamente dalla tabella\n");
-            delete_last_element(&file_list);
+        int rep;
+        rep = icl_hash_delete(hTable, (void*)to_delete, NULL, free); //Lo tolgo sia dalla hashTable che dalla lista dei file
+        if (rep != 0) {
+            fprintf(stderr, "Errore - Impossibile eliminare file\n");
             UNLOCK(&fileListLock);
-            return 0;
-        }
+            return -1;
+        } 
+        printf("File eliminato correttamente dalla tabella\n");
+        delete_last_element(&file_list);
+        UNLOCK(&fileListLock);
+        return 0;
     }
     return -1; //Non ho avuto bisogno di eliminare file
 }
@@ -238,7 +243,7 @@ void threadWorker(void *arg) {
             //print_q(open_file);
             UNLOCK(&openFileLock);
             printf("File is open - SUCCESS\n");
-            msg.size = strnlen(msg.data, MAX_FILE_SIZE);
+            msg.size = strlen(msg.data);
             printf("MSG SIZE IS: %ld\n", msg.size);
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size);
@@ -382,12 +387,11 @@ static void *sigHandler(void *arg) {
 	        case SIGINT:
 	        case SIGQUIT:
                 printf("Ricevuto segnale %s, avvio chiusura immediata\n", (sig==SIGINT) ? "SIGINT" : "SIGQUIT");
-                destroy_everything(1); //Con '1' termina subito e non accetta nuove richieste
                 close(fd_pipe);
                 pthread_exit(NULL);
 	        case SIGHUP:
 	            printf("Ricevuto segnale %s, aspetto i thread attivi e termino\n", "SIGHUP");
-                destroy_everything(0); //Con '0' aspetta i thread pendenti e poi termina (Non accetta nuove connessioni)
+                //destroy_everything(0); //Con '0' aspetta i thread pendenti e poi termina (Non accetta nuove connessioni)
 	            close(fd_pipe);  // notifico il listener thread della ricezione del segnale
                 //pthread_exit(NULL);
                 return NULL;
@@ -632,8 +636,10 @@ int main (int argc, char **argv) {
 		    if (r < 0) { //Fallimento
 			    fprintf(stderr, "Impossibile aggiungere al threadPool\n");
 		    } 
-            else { //Non ci sono thread disponibili
-			    fprintf(stderr, "Errore - nessun thread disponibile\n");
+            else { //Non ci sono thread disponibili - spawno un thread in modalità detached
+			    fprintf(stderr, "Errore - nessun thread disponibile, spawno un thread in modalità detached\n");
+                spawnThread(threadWorker, (void*)args);
+                continue;
 		    }
 		    free(args);
 		   	close(connfd);
@@ -642,7 +648,7 @@ int main (int argc, char **argv) {
 	    }
 	}
     }
-    //destroy_everything(0); //libererà la memoria aspettando che tutti i thread finiscano
+    destroy_everything(0); //libererà la memoria aspettando che tutti i thread finiscano
     pthread_join(sighandler_thread, NULL);
     return 0;    
 }

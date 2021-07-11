@@ -1,6 +1,6 @@
 #include "api.h"
 
-static int fd_skt;
+static long fd_skt;
 
 /*Scrive il contenuto di un file sul disco. Se dirname non esiste, verrà creata.
 Ritorna 0 in caso di successo, -1 in caso di errore.*/
@@ -42,6 +42,11 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
     return 0;
 }
 
+/*Viene aperta una connessione AF_UNIX al socket file sockname. Se il server non accetta immediatamente la
+richiesta di connessione, la connessione da parte del client viene ripetuta dopo ‘msec’ millisecondi e fino allo
+scadere del tempo assoluto ‘abstime’ specificato come terzo argomento. Ritorna 0 in caso di successo, -1 in caso
+di fallimento, errno viene settato opportunamente.*/
+
 int openConnection(const char *sockname, int msec, const struct timespec abstime) {
     errno = 0;
     int r = 0; 
@@ -58,7 +63,7 @@ int openConnection(const char *sockname, int msec, const struct timespec abstime
     struct timespec current_time;
     SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     while ((r = connect(fd_skt,(struct sockaddr*)&sa,sizeof(sa))) != 0 && abstime.tv_sec > current_time.tv_sec) {
-        sleep(msec * 1000);
+        usleep(msec * 1000);
         SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     }
     errno = ETIMEDOUT;

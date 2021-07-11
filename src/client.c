@@ -153,18 +153,18 @@ int main(int argc, char **argv) {
 	    print_usage(argv[0]);
 	    exit(EXIT_FAILURE);
         }
-    //char *sock_name;
+    char *sock_name = NULL;
     int opt;
     int rFlag = 0, RFlag = 0;
     //Da implementare: -h, -f, -r, -R, -t, -p
-    while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R::t:l:u:c:p")) != -1) {
+    while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R::t:a:l:u:c:p")) != -1) {
         switch(opt) {
             case 'h': {
                 print_usage(argv[0]);
                 return 0;
             }
             case 'f': {
-                //sock_name = optarg;
+                sock_name = optarg;
                 break;
             }
             case 'r': {
@@ -190,10 +190,10 @@ int main(int argc, char **argv) {
             }
             case 'R': {
                 //int err;
-                if (isNumber(optarg, &n_files) != 0) {
+                /*if (isNumber(optarg, &n_files) != 0) {
                     fprintf(stderr, "Non è stato inserito un numero\n");
                     //break;
-                }
+                }*/
                 //printf("%ld\n", n_files);
                 insert(queue, 'R', (void*)n_files);
                 RFlag = 1;
@@ -225,27 +225,29 @@ int main(int argc, char **argv) {
                 break;
         }
     }
-    if ((config = read_config("../test/config.txt")) == NULL) {
+    /*if ((config = read_config("../test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
-    } //Lettura parametri dal file config
+    } *///Lettura parametri dal file config
     //--- Connetto al socket --- 
     //printf("%s\n", config->sock_name);
     struct timespec time;
     clock_gettime(CLOCK_REALTIME, &time);
     time.tv_sec += 5;
-    if (openConnection(config->sock_name, 1000, time) == 0) {
+    if (openConnection(sock_name, 1000, time) == 0) {
         if (pFlag != 0)
             printf("openConnection: Client connesso\n");
     }
-    else 
+    else {
         printf("openConnection: Impossibile connettersi\n");
+        return -1;
+    }
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request(); //Invio la richiesta
         if (sleep_time != 0)
             usleep(sleep_time);
     }
-    if (closeConnection(config->sock_name) == 0) 
+    if (closeConnection(sock_name) == 0) 
     {
         if (pFlag != 0)
             printf("closeConnection: Connessione chiusa\n");

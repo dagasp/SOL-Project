@@ -149,6 +149,10 @@ icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append)
     return 0;
 }
 
+size_t get_current_size (icl_hash_t *ht) {
+    return ht->curr_size;
+}
+
 /**
  * Append something to an item in the hash table.
  *
@@ -167,6 +171,12 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     if (!data) {
         return -1;
     }
+
+    /*Aggiorno la memoria lockando la hTable*/
+    LOCK(&ht->tableLock);
+    ht->curr_size = ht->curr_size + size; 
+    UNLOCK(&ht->tableLock);
+
     size_t oldsize = strlen(data);
     char *res = malloc(oldsize+size+1);
     if (!res) {
@@ -261,8 +271,8 @@ int icl_hash_delete(icl_hash_t *ht, void* key, void (*free_key)(void*), void (*f
             if (*free_key && curr->key) (*free_key)(curr->key);
             if (*free_data && curr->data) {
                 size_t old_size = strlen((char*)curr->data); //Peso in byte del file che sto per eliminare
-                (*free_data)(curr->data);
                 ht->curr_size = ht->curr_size - old_size; //Diminuisco l'attuale memoria utilizzata di 'old_size' byte
+                (*free_data)(curr->data);
             } 
             ht->nentries--;
             free(curr);

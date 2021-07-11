@@ -106,8 +106,8 @@ void delete_last_element(list **head) {
         prev = curr;
         curr = curr->next;
     }
+    free(prev->next);
     prev->next = NULL;
-    free(curr);
 }
 
 void print_q(list *list) {

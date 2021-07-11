@@ -45,6 +45,11 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
 int openConnection(const char *sockname, int msec, const struct timespec abstime) {
     errno = 0;
     int r = 0; 
+    if (!sockname) {
+        fprintf(stderr, "openConnection: sockname non valido\n");
+        errno = EINVAL;
+        return -1;
+    }
     struct sockaddr_un sa;
     memset(&sa, '0', sizeof(sa));
     strncpy(sa.sun_path, sockname, UNIX_MAX_PATH);
@@ -154,7 +159,7 @@ int readNFiles(int N, const char *dirname) { //Controllare se dirname = NULL, in
     //printf("Sono dentro l'API readNFiles\n");
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
-    //printf("FILE DA LEGGERE: %d\n", files_letti);
+    printf("FILE DA LEGGERE: %d\n", files_letti);
     for (int i = 0; i < files_letti; i++) {
         SYSCALL_RETURN("readn", n, readn(fd_skt, &server_rep, sizeof(server_reply)), "Errore - impossibile ricevere risposta dal server\n", "");
         //printf("PATH RICEVUTO: %s\n", server_rep.pathname);

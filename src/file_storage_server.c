@@ -31,7 +31,6 @@ typedef struct {
 //Configurazione server da file
 static config_file *conf;
 
-
 //Hash table dei file e la sua lock
 static icl_hash_t *hTable = NULL; 
 pthread_mutex_t filesTable = PTHREAD_MUTEX_INITIALIZER;
@@ -88,17 +87,34 @@ int check_numOfFiles_FIFO() {
 static int how_many = 0;
 int check_memory_FIFO(size_t new_size) {
     if (new_size == 0) return 0; //Se il file da inserire è vuoto, esco per inserirlo subito
-    if (new_size > hTable->max_size) return -1;
-    if (hTable->curr_size + new_size > hTable->max_size && hTable->nentries > 0) { //Memoria superata-> ho bisogno di liberare spazio
-        printf("Ho raggiunto la dimensione massima della memoria, elimino il primo file inserito\n");
+    if (new_size > hTable->max_size) {
+        fprintf(stderr, "Errore, il nuovo contenuto sarebbe più grande della dimensione massima della memoria\n");
+        return -1;
+    } 
+    if (get_current_size(hTable) + new_size > hTable->max_size) { //Memoria superata-> ho bisogno di liberare spazio
+        printf("CURR SIZE: %ld\n", hTable->curr_size);
+        printf("Ho raggiunto la dimensione massima della memoria, elimino qualcosa...\n");
         LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list);
-        if (!to_delete) return -1;
-        if (icl_hash_delete(hTable, (void*)to_delete, NULL, free) == 0) { //Lo tolgo sia dalla hashTable che dalla lista dei file 
-            printf("File eliminato correttamente\n");
-            how_many++;
-            delete_last_element(&file_list); 
+        //printf("TO DELETE: %s\n", to_delete);
+        if (!to_delete) {
+            UNLOCK(&fileListLock);
+            return -1;
         }
+        int rep;
+        rep = icl_hash_delete(hTable, (void*)to_delete, NULL, free); //Lo tolgo sia dalla hashTable che dalla lista dei file 
+        if (rep != 0) {
+            fprintf(stderr, "Errore - non è stato possibile eliminare il file\n");
+            UNLOCK(&fileListLock);
+            return -1;
+        }
+        printf("File eliminato correttamente\n");
+        how_many++;
+       // printf("BEFORE-----------------------------\n");
+        //print_q(file_list);
+        delete_last_element(&file_list);
+       // printf("AFTER-----------------------------\n");
+        //print_q(file_list); 
         UNLOCK(&fileListLock); 
         check_memory_FIFO(new_size);  
     }
@@ -252,7 +268,7 @@ void threadWorker(void *arg) {
                     perror("writenReadN1");
                     break;     
             }
-            if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //Operazione andata a buon fine, invio feedback positivo
+            if (icl_hash_dump(connFd, hTable, available_files) == 0) { //Operazione andata a buon fine, invio feedback positivo
                 printf("OK\n");
             }
             else printf("NOT OK \n");
@@ -373,7 +389,8 @@ static void *sigHandler(void *arg) {
 	            printf("Ricevuto segnale %s, aspetto i thread attivi e termino\n", "SIGHUP");
                 destroy_everything(0); //Con '0' aspetta i thread pendenti e poi termina (Non accetta nuove connessioni)
 	            close(fd_pipe);  // notifico il listener thread della ricezione del segnale
-                pthread_exit(NULL);
+                //pthread_exit(NULL);
+                return NULL;
 	default:  ; 
 	    }
     }
@@ -382,10 +399,12 @@ static void *sigHandler(void *arg) {
 
 int main (int argc, char **argv) {
     //Lettura dei parametri dal file di configurazione
-    if ((conf = read_config("../test/config.txt")) == NULL) {
+    if ((conf = read_config("./test/config.txt")) == NULL) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
     }
+    //conf->sock_name[strcspn(conf->sock_name, "\r\n")] = '\0';
+    //printf("%s", conf->sock_name);
     //hTable = icl_hash_create(conf->num_of_files, NULL, NULL, conf->memory_space, conf->num_of_files);
     open_file = NULL;
     file_list = NULL;
@@ -394,11 +413,12 @@ int main (int argc, char **argv) {
 
     /*Debug inserimento file server*/
     //printf("SIZE: %ld\n", sizeof(hTable)/MB);
-    insert_file(&file_list, "pippo");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/gianni");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/minnie");
     insert_file(&file_list, "pippos");
     insert_file(&file_list, "/mnt/c/Users/davyx/files/giannis");
+    insert_file(&file_list, "pippo");
+    insert_file(&file_list, "albertino");
     //insert_tail(&file_list, "Ultimo");
     //print_q(file_list);
     //delete_last_element(&file_list);
@@ -408,11 +428,12 @@ int main (int argc, char **argv) {
     delete_by_key(&file_list, "/mnt/c/Users/davyx/files/minnies");
     print_q(file_list);*/
     hTable = icl_hash_create(conf->num_of_files, NULL, NULL, conf->memory_space, conf->num_of_files);
-    char *file_pippo = strdup("wow che contenuto");
     char *file_gianni = strdup("no vabbè");
     char *file_minnie = strdup("sempre meglio");
     char *file_pippos = strdup("ancora più bello");
     char *file_giannis = strdup("fantastico");
+    char *file_pippo = strdup("wow che contenuto");
+    char *file_albertino = strdup("Ciao sono albertino, questo è il mio file, bellissimo.");
 
     if (check_numOfFiles_FIFO() != 0) {
         icl_hash_insert(hTable, "pippo", (void*)file_pippo);
@@ -428,6 +449,9 @@ int main (int argc, char **argv) {
     }
     if (check_numOfFiles_FIFO() != 0) {
         icl_hash_insert(hTable, "/mnt/c/Users/davyx/files/giannis", (void*)file_giannis);
+    }
+    if (check_numOfFiles_FIFO() != 0) {
+        icl_hash_insert(hTable, "albertino", (void*)file_albertino);
     }
     //printf("%s\n",get_last_file(file_list));
     //check_memory_FIFO(34);

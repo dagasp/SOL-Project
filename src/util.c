@@ -8,7 +8,7 @@ config_file *read_config(char *config) {
     //long num;
     int line = 0;
     if ((fd=fopen(config, "r")) == NULL) {
-        fclose(fd);
+        //fclose(fd);
         fprintf(stderr, "Errore nell'apertura del file di config\n");
         return NULL;
     }
@@ -36,7 +36,7 @@ config_file *read_config(char *config) {
                 }*/
                 conf->num_of_threads = atoi(buf);
                 break;
-            case 1:
+            case 1: ;
                /* if (isNumber(buf, &num) == 0) {
                     conf->memory_space = num;
                 }
@@ -54,16 +54,16 @@ config_file *read_config(char *config) {
                     fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
                 }*/
-                strncpy(conf->sock_name, buf, BUFSIZE);
+                strcpy(conf->sock_name, buf);
                 break;
-            case 4:
+            //case 4:
                 /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'directory' non è una stringa!\n");
                     return NULL;
                 }*/
-                strncpy(conf->directory, buf, BUFSIZE);
-                break;
-            default:
+                //strncpy(conf->directory, buf, BUFSIZE);
+                //break;
+            default: ;
                 break;
         }
         line++;

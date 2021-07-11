@@ -52,7 +52,6 @@ typedef struct config_file {
     unsigned int num_of_threads;
     unsigned int num_of_files;
     char sock_name[BUFSIZE];
-    char directory[PATH_MAX];
 } config_file;
 
 typedef struct msg {

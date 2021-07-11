@@ -50,6 +50,7 @@ icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append);
 
 icl_entry_t
 * icl_hash_insert(icl_hash_t *, void*, void *);
+size_t get_current_size (icl_hash_t *ht);
 
 int
 icl_hash_destroy(icl_hash_t *, void (*)(void*), void (*)(void*)),

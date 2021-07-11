@@ -19,7 +19,8 @@ TARGETS		= file_storage_server client
 .SUFFIXES: .c .h
 
 $(OBJ_DIR)%.o: $(SRC_DIR)%.c
-	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $<
+	@ mkdir -p obj_files
+	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -c -o $@ $<	
 
 all		: $(TARGETS)
 
@@ -31,14 +32,17 @@ client: $(OBJ_DIR)client.o $(OBJ_DIR)util.o $(LIB_DIR)libStruct.a $(LIB_DIR)libA
 
 #Libreria threadpool
 $(LIB_DIR)libPool.a: $(OBJ_DIR)threadpool.o 
+	@ mkdir -p libs
 	$(AR) $(ARFLAGS) $@ $^
 
 #Libreria strutture dati
 $(LIB_DIR)libStruct.a: $(OBJ_DIR)hash.o $(OBJ_DIR)queue.o $(OBJ_DIR)list.o
+	@ mkdir -p libs
 	$(AR) $(ARFLAGS) $@ $^
 
 #Libreria API
 $(LIB_DIR)libApi.a: $(OBJ_DIR)api.o ./headers/api.h
+	@ mkdir -p libs
 	$(AR) $(ARFLAGS) $@ $^
 
 #Script bash dei test

@@ -111,11 +111,17 @@ void send_request () {
                 printf("Agg appis\n");
             else
                 printf("Impossibile appendere\n");*/
-            if (dFlag != 0) {
+            //printf("dirnameAAA : %s\n", dir_name.data);
+            if (dir_name.data) { //Se non è NULL è perchè -d ci ha scritto dentro qualcosa, devo salvare il file in locale
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
-                    fprintf(stderr, "Non è stato possibile scrivere sui files\n");
+                    if (pFlag != 0)
+                        fprintf(stderr, "writeToFile: Non è stato possibile scrivere sui files\n");
                     free(msg_t.data);
                     break;
+                }
+                else {
+                    if (pFlag != 0)
+                        printf("writeToFile: File salvato in locale\n");
                 }
             }
             if (closeFile(path) == 0) {
@@ -126,13 +132,10 @@ void send_request () {
                 if (pFlag != 0)
                     printf("closeFile: Non è stato possibile chiudere il file\n");
             }
-            //free(msg_t.data);
+            free(msg_t.data);
             break;
         }
         case 'R': {//Invio richiesta al server di lettura di N files
-            //int err;
-            //printf("Sono nella readNFiles\n");
-            //printf("OP CODE: %c\n", opt);
             int n_files_to_read = *((int*)&n->data);
             int how_many;
             how_many = readNFiles(n_files_to_read, dir_name.data);
@@ -175,7 +178,6 @@ int main(int argc, char **argv) {
     char *sock_name = NULL;
     int opt;
     int rFlag = 0, RFlag = 0;
-    //Da implementare: -h, -f, -r, -R, -t, -p
     while ((opt = getopt(argc, argv, "hf:w:W:D:d:r:R::t:a:l:u:c:p")) != -1) {
         switch(opt) {
             case 'h': {
@@ -199,21 +201,9 @@ int main(int argc, char **argv) {
                 //insert(queue, 'r', (void*)data);
                 rFlag = 1;
                 i = 0;
-                //printf("TO FREE: %d\n", to_free);
-                /*while (to_free > 0) {
-                    free(to_do[i]);
-                    i++;
-                    to_free--;
-                }*/
                 break;
             }
             case 'R': {
-                //int err;
-                /*if (isNumber(optarg, &n_files) != 0) {
-                    fprintf(stderr, "Non è stato inserito un numero\n");
-                    //break;
-                }*/
-                //printf("%ld\n", n_files);
                 insert(queue, 'R', (void*)n_files);
                 RFlag = 1;
                 break;

@@ -99,15 +99,22 @@ char *get_last_file(list *l) {
     else return NULL;
 }
 
-void delete_last_element(list **head) {
+int delete_last_element(list **head) {
     list *curr = *head;
     list *prev = NULL;
+    if (*head == NULL) return -1;
     while (curr->next != NULL) {
         prev = curr;
         curr = curr->next;
     }
+    if (prev == NULL) {
+        free(curr);
+        *head = NULL;
+        return 0;
+    } 
     free(prev->next);
     prev->next = NULL;
+    return 0;
 }
 
 void print_q(list *list) {

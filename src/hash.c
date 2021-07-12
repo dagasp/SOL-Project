@@ -97,7 +97,7 @@ icl_hash_create( int nbuckets, unsigned int (*hash_function)(void*), int (*hash_
     ht->hash_key_compare = hash_key_compare ? hash_key_compare : string_compare;
     ht->curr_size = 0;
     if (pthread_mutex_init(&ht->tableLock, NULL) != 0) {
-        fprintf(stderr, "Errore nell'inizializzazione della lock\n");
+        fprintf(stderr, "SERVER: Errore nell'inizializzazione della lock\n");
         return NULL;
     }
     ht->max_size = maxSize;
@@ -177,13 +177,13 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     size_t oldsize = strlen(data);
 
     if (size > MAX_FILE_SIZE || oldsize + size > MAX_FILE_SIZE) {
-        fprintf(stderr, "Errore - il contenuto da scrivere supera la memoria massima per un file\n");
+        fprintf(stderr, "SERVER: Errore - il contenuto da scrivere supera la memoria massima per un file\n");
         return -1;
     }
 
     char *res = malloc(oldsize+size+1);
     if (!res) {
-        fprintf(stderr, "Errore nella malloc\n");
+        fprintf(stderr, "SERVER: Errore nella malloc\n");
         return -1;
     }
     memcpy(res, data, oldsize);
@@ -224,12 +224,12 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data, size_t size)
     
     /*Superata la memoria*/
     if (size > ht->max_size) {
-        fprintf(stderr, "Errore - file troppo grande per la memoria dello storage\n"); //Se il file è più grande della capienza massima della tabella, non lo inserisco
+        fprintf(stderr, "SERVER: Errore - file troppo grande per la memoria dello storage\n"); //Se il file è più grande della capienza massima della tabella, non lo inserisco
         return NULL;
     }
 
     if (size > MAX_FILE_SIZE) {
-        fprintf(stderr, "Errore - il contenuto da scrivere supera la memoria massima per un file\n");
+        fprintf(stderr, "SERVER: Errore - il contenuto da scrivere supera la memoria massima per un file\n");
         return NULL;
     }
 
@@ -383,7 +383,7 @@ icl_hash_dump_2(FILE* stream, icl_hash_t* ht)
 
     if(!ht) return -1;
     
-    fprintf(stream, "\n\nFile presenti al momento nello storage:\n");
+    fprintf(stream, "\n\nSERVER: File presenti al momento nello storage:\n");
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {

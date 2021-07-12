@@ -22,7 +22,7 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
        tmp_dirname = get_path(dirname);
        //strcpy(tmp_dirname, dirname);        
     }
-    printf("%s\n", tmp_dirname);
+    //printf("%s\n", tmp_dirname);
     FILE *stream = NULL;
     strcat(tmp_dirname, "/");
     char *fileName = basename(pathname); //Prende il nome del file da pathname
@@ -63,7 +63,7 @@ int openConnection(const char *sockname, int msec, const struct timespec abstime
     struct timespec current_time;
     SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     while ((r = connect(fd_skt,(struct sockaddr*)&sa,sizeof(sa))) != 0 && abstime.tv_sec > current_time.tv_sec) {
-        usleep(msec * 1000);
+        usleep(msec * 1000); //usleep for ms
         SYSCALL_RETURN("clock_getime", r, clock_gettime(CLOCK_REALTIME, &current_time), "Errore in clock_gettime\n", "");
     }
     errno = ETIMEDOUT;
@@ -92,10 +92,11 @@ int openFile(const char *pathname, int flags) {
     }
     client_operations client_op;
     memset(&client_op, 0, sizeof(client_operations));
+    char *realPath = get_path(pathname);
     client_op.flags = flags;
     client_op.op_code = OPENFILE;
     client_op.client_desc = fd_skt;
-    strcpy(client_op.pathname,pathname);
+    strcpy(client_op.pathname,realPath);
     int n, rep_code;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Errore nell'invio della richiesta di apertura file\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &rep_code, sizeof(int)), "Errore, impossibile ricevere risposta dal Server\n", "");
@@ -125,8 +126,8 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     memset(&server_rep, 0, sizeof(server_reply));
     client_op.op_code = READFILE;
     client_op.client_desc = fd_skt;
-    //get_path(pathname);
-    memcpy(client_op.pathname, pathname, strlen(pathname)+1);
+    char *realPath = get_path(pathname);
+    memcpy(client_op.pathname, realPath, strlen(realPath)+1);
     //strcpy(client_op.pathname, pathname);
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Errore nell'invio della richiesta di lettura\n", "");
     //Farsi mandare dal server la strlen del buffer da scrivere ---
@@ -231,7 +232,8 @@ int closeFile(const char *pathname) {
     memset(&client_op, 0, sizeof(client_operations));
     client_op.op_code = CLOSEFILE;
     client_op.client_desc = fd_skt;
-    strcpy(client_op.pathname, pathname);
+    char *realPath = get_path(pathname);
+    strcpy(client_op.pathname, realPath);
     int n, fb;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di chiusura del file al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
@@ -257,3 +259,40 @@ int closeConnection(const char *sockname) {
     return 0;
 }
 
+
+/*Legge un file in locale e manda al server pathname e contenuto
+Ritorna 0 in caso di successo, -1 in caso di errore.
+errno viene settato */
+int writeFile (char *file_name) {
+    FILE *fp = NULL;
+    if ((fp = fopen(file_name, "rb")) == NULL) {
+        fprintf(stderr, "Errore nell'apertura del file\n");
+        return -1;
+    }
+    char *path = get_path(file_name);
+    client_operations client_op;
+    memset(&client_op, 0, sizeof(client_operations));
+    char *to_read = malloc(sizeof(char)*MAX_FILE_SIZE);
+    if (!to_read) {
+        fprintf(stderr, "Errore nella malloc\n");
+        errno = ENOMEM;
+        return -1;
+    }
+    memset(to_read, 0, MAX_FILE_SIZE);
+    size_t n_read = fread(to_read, sizeof(char), MAX_FILE_SIZE, fp);
+    int n;
+    if (n_read < 0) {
+        fprintf(stderr, "Impossibile leggere dal file\n");
+        SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
+    }
+    client_op.size = n_read;
+    client_op.op_code = WRITEFILE;
+    strcpy(client_op.pathname, path);
+    memcpy(client_op.data, to_read, n_read);
+    free(to_read);
+    int fb;
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di chiusura del file al server\n", "");
+    SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
+    SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
+    return fb;
+}

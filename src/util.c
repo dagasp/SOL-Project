@@ -49,12 +49,15 @@ config_file *read_config(char *config) {
             case 2:
                 conf->num_of_files = atoi(buf);
                 break;
-            case 3:
+            case 3: ;
                 /*if (isNumber(buf, &num) == 0) {
                     fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
                 }*/
-                strcpy(conf->sock_name, buf);
+                char *tmp = buf;
+                char *token = strtok(tmp, "\r\n"); //Serve a pulire la stringa togliendo lo /n o /r
+                strcpy(conf->sock_name, token);
+                //printf("%s\n", conf->sock_name);
                 break;
             //case 4:
                 /*if (isNumber(buf, &num) == 0) {

@@ -45,7 +45,15 @@
 #if !defined (MB)
 #define MB 1024*1024 //1MB
 #endif
-
+enum OP_CODE {
+    OPENFILE = 0,
+    READFILE = 1,
+    READNFILES = 2,
+    WRITEFILE = 3,
+    APPENDTOFILE = 4,
+    CLOSEFILE = 5,
+    CLOSECONNECTION = 6
+};
 /*Header contenente funzioni utilità e strutture dati d'appoggio*/
 typedef struct config_file {
     long memory_space;
@@ -53,6 +61,26 @@ typedef struct config_file {
     unsigned int num_of_files;
     char sock_name[BUFSIZE];
 } config_file;
+
+typedef struct client_operations {
+    char pathname[MAX_PATH];
+    char data[MAX_FILE_SIZE];
+    char dirname [MAX_PATH];
+    long client_desc;
+    unsigned int op_code;
+    int flags;
+    int feedback;
+    int files_to_read;
+    size_t size;
+} client_operations;
+
+typedef struct server_reply {
+    char pathname[MAX_PATH];
+    char data[MAX_FILE_SIZE];
+    unsigned int size;
+    unsigned int reply_code;
+    int n_files_letti;
+} server_reply;
 
 typedef struct msg {
   char *data;

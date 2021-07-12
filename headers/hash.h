@@ -20,6 +20,12 @@
 extern "C" {
 #endif
 
+
+/*
+* @key -- file's pathname
+* @data -- file's content
+* @next -- pointer to the next element
+*/
 typedef struct icl_entry_s {
     void* key;
     void *data;
@@ -27,6 +33,14 @@ typedef struct icl_entry_s {
     struct icl_entry_s* next;
 } icl_entry_t;
 
+
+/*
+* @nbuckets -- number of buckets
+* @nentries -- current number of entries
+* @max_size -- maximum memory size
+* @max_files -- maximum number of files
+* @tableLock -- hash table's lock
+*/
 typedef struct icl_hash_s {
     int nbuckets;
     int nentries;
@@ -49,7 +63,7 @@ int
 icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append);
 
 icl_entry_t
-* icl_hash_insert(icl_hash_t *, void*, void *);
+* icl_hash_insert(icl_hash_t *, void*, void *, size_t);
 size_t get_current_size (icl_hash_t *ht);
 
 int

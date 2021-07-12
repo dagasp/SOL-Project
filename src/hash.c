@@ -71,6 +71,8 @@ int get_n_entries(icl_hash_t *t) {
  * @param[in] nbuckets -- number of buckets to create
  * @param[in] hash_function -- pointer to the hashing function to be used
  * @param[in] hash_key_compare -- pointer to the hash key comparison function to be used
+ * @param[in] maxSize -- maximum memory that can be used from the hash table
+ * @param[in] maxFiles -- maximum number of files that can be stored on the hash table
  *
  * @returns pointer to new hash table.
  */
@@ -172,12 +174,13 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
         return -1;
     }
 
-    /*Aggiorno la memoria lockando la hTable*/
-    LOCK(&ht->tableLock);
-    ht->curr_size = ht->curr_size + size; 
-    UNLOCK(&ht->tableLock);
-
     size_t oldsize = strlen(data);
+
+    if (size > MAX_FILE_SIZE || oldsize + size > MAX_FILE_SIZE) {
+        fprintf(stderr, "Errore - il contenuto da scrivere supera la memoria massima per un file\n");
+        return -1;
+    }
+
     char *res = malloc(oldsize+size+1);
     if (!res) {
         fprintf(stderr, "Errore nella malloc\n");
@@ -185,8 +188,13 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
     }
     memcpy(res, data, oldsize);
     memcpy(res+oldsize, new_data, size+1);
-    if (icl_hash_find_and_append(ht, key, (void*)res) == 0)
+    if (icl_hash_find_and_append(ht, key, (void*)res) == 0) { //Se ho appeso con successo
+        /*Aggiorno la memoria lockando la hTable*/
+        LOCK(&ht->tableLock);
+        ht->curr_size = ht->curr_size + size; 
+        UNLOCK(&ht->tableLock);
         return 0;
+    }
     return -1;
 }
 
@@ -197,34 +205,40 @@ int append (icl_hash_t *ht, void *key, char *new_data, size_t size) {
  * @param ht -- the hash table
  * @param key -- the key of the new item
  * @param data -- pointer to the new item's data
- *
+ * @param size -- the new data's size
  * @returns pointer to the new item.  Returns NULL on error.
  */
 
 
 
 icl_entry_t *
-icl_hash_insert(icl_hash_t *ht, void* key, void *data)
+icl_hash_insert(icl_hash_t *ht, void* key, void *data, size_t size)
 {
     icl_entry_t *curr;
     unsigned int hash_val;
-    size_t len_of_data;
+    //size_t len_of_data = 0;
     if(!ht || !key) return NULL;
-    if (data) {
+    /*if (data) {
         len_of_data = strnlen((char*)data, MAX_FILE_SIZE);
+    }*/
+    
+    /*Superata la memoria*/
+    if (size > ht->max_size) {
+        fprintf(stderr, "Errore - file troppo grande per la memoria dello storage\n"); //Se il file è più grande della capienza massima della tabella, non lo inserisco
+        return NULL;
     }
+
+    if (size > MAX_FILE_SIZE) {
+        fprintf(stderr, "Errore - il contenuto da scrivere supera la memoria massima per un file\n");
+        return NULL;
+    }
+
     hash_val = (* ht->hash_function)(key) % ht->nbuckets;
 
     LOCK(&ht->tableLock);
     for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
         if ( ht->hash_key_compare(curr->key, key))
-            return(NULL); /* key already exists */
-    
-    /*Superata la memoria*/
-    if (len_of_data > ht->max_size) {
-        fprintf(stderr, "Errore - file troppo grande per la memoria dello storage\n"); //Se il file è più grande della capienza massima della tabella, non lo inserisco
-        return NULL;
-    }                                                                                   
+            return(NULL); /* key already exists */                                                                               
 
     /* if key was not found */
     curr = (icl_entry_t*)malloc(sizeof(icl_entry_t));
@@ -236,7 +250,7 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data)
     curr->next = ht->buckets[hash_val]; /* add at start */
     ht->buckets[hash_val] = curr;
     ht->nentries++;
-    ht->curr_size += len_of_data;
+    ht->curr_size += size;
     UNLOCK(&ht->tableLock);
     return curr;
 }
@@ -338,7 +352,7 @@ icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
     icl_entry_t *bucket, *curr;
     int i;
     server_reply server_rep;
-    memset(&server_rep, 0, sizeof(server_rep));
+    memset(&server_rep, 0, sizeof(server_reply));
     if(!ht) return -1;
     int file_readed = 0;
     for(i=0; i<ht->nbuckets; i++) {
@@ -368,12 +382,13 @@ icl_hash_dump_2(FILE* stream, icl_hash_t* ht)
     int i;
 
     if(!ht) return -1;
-
+    
+    fprintf(stream, "\n\nFile presenti al momento nello storage:\n");
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {
             if(curr->key)
-                fprintf(stream, "icl_hash_dump: %s: %s\n", (char *)curr->key, (char*)curr->data);
+                fprintf(stream, "%s\n", (char *)curr->key);
             curr=curr->next;
         }
     }

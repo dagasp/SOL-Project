@@ -20,3 +20,4 @@ sleep 2s
 
 kill -s SIGHUP $pid #Chiude il server mandando il segnale SIGHUP
 wait $pid
+echo "ByeBye!";

@@ -54,6 +54,7 @@ char ** tokenize_args(char *args, unsigned int *hM) {
     return arg;
 }
 
+
 /*
 * Invia le richieste al server sfruttando le API del client
 *
@@ -71,7 +72,7 @@ void send_request () {
             //int err_code;
             size_t size;
             char *path = n->data;
-            if ((openFile(path, 3) != 0)) { //Prova openFile senza specificare flags
+            if ((openFile(path, 3) != 0)) { //openFile senza specificare flags
                 printf("openFile: Impossibile aprire il file\n");
             }
 
@@ -97,7 +98,8 @@ void send_request () {
                     printf("readFile: Letti %ld bytes\n", size);
             }
             else {
-                printf("readFile: Impossibile leggere il file\n");
+                if (pFlag != 0)
+                    printf("readFile: Impossibile leggere il file\n");
                 break;
             }
             //printf("FILE RICEVUTO: %s\n", msg_t.data);
@@ -120,8 +122,11 @@ void send_request () {
                 if (pFlag != 0)
                     printf("closeFile: File chiuso correttamente\n");
             } 
-            else printf("closeFile: Non è stato possibile chiudere il file\n");
-            free(msg_t.data);
+            else {
+                if (pFlag != 0)
+                    printf("closeFile: Non è stato possibile chiudere il file\n");
+            }
+            //free(msg_t.data);
             break;
         }
         case 'R': {//Invio richiesta al server di lettura di N files
@@ -132,11 +137,25 @@ void send_request () {
             int how_many;
             how_many = readNFiles(n_files_to_read, dir_name.data);
             if (how_many < 0) {
-                fprintf(stderr, "readNFiles: Non è stato possibile leggere i files dal server\n");
+                if (pFlag != 0)
+                    fprintf(stderr, "readNFiles: Non è stato possibile leggere i files dal server\n");
             }
             else {
                 if (pFlag != 0)
                     printf("readNFiles: Letti correttamente %d file\n", how_many);
+            }
+            break;
+        }
+        case 'w': {
+            int rep = writeFile(n->data);
+            if (rep == 0) {
+                if (pFlag != 0) {
+                    printf("writeFile: File caricato correttamente\n");
+                }
+            }
+            else {
+                if (pFlag != 0)
+                    fprintf(stderr, "writeFile: Non è stato possibile caricare il file nel server\n");
             }
             break;
         }
@@ -199,6 +218,9 @@ int main(int argc, char **argv) {
                 RFlag = 1;
                 break;
             }
+            case 'w':
+                insert(queue, 'w', (void*)optarg);
+                break;
             case 'd':
                 if (rFlag == 0 && RFlag == 0) {
                     fprintf(stderr, "Errore, il comando -d va usato congiuntamente a -r o -R\n");
@@ -239,7 +261,8 @@ int main(int argc, char **argv) {
             printf("openConnection: Client connesso\n");
     }
     else {
-        printf("openConnection: Impossibile connettersi\n");
+        if (pFlag != 0)
+            printf("openConnection: Impossibile connettersi\n");
         return -1;
     }
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
@@ -251,8 +274,10 @@ int main(int argc, char **argv) {
         if (pFlag != 0)
             printf("closeConnection: Connessione chiusa\n");
     }
-    else 
-        printf("closeConnection: Impossibile chiudere la connessione\n");
+    else {
+        if (pFlag != 0)
+            printf("closeConnection: Impossibile chiudere la connessione\n");
+    }
     int i = 0;
     
     /*Clean della memoria occupata dall'array di stringhe usato per il parsing degli argomenti*/

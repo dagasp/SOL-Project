@@ -24,7 +24,7 @@ $(OBJ_DIR)%.o: $(SRC_DIR)%.c
 
 all		: $(TARGETS)
 
-file_storage_server: $(OBJ_DIR)file_storage_server.o $(OBJ_DIR)util.o $(LIB_DIR)libPool.a $(LIB_DIR)libStruct.a $(LIB_DIR)libApi.a
+file_storage_server: $(OBJ_DIR)file_storage_server.o $(OBJ_DIR)util.o $(LIB_DIR)libPool.a $(LIB_DIR)libStruct.a
 	$(CC) $(CFLAGS) $(INCLUDES) $(OPTFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS)
 
 client: $(OBJ_DIR)client.o $(OBJ_DIR)util.o $(LIB_DIR)libStruct.a $(LIB_DIR)libApi.a
@@ -68,7 +68,7 @@ $(OBJ_DIR)api.o: $(SRC_DIR)api.c
 
 $(OBJ_DIR)threadpool.o: $(SRC_DIR)threadpool.c 
 
-#Clean per eliminare taregets, file oggetto e librerie
+#Clean per eliminare targets, file oggetto e librerie
 clean		: 
 	rm -f $(TARGETS)
 cleanall	: clean

@@ -26,7 +26,6 @@ int insert_file(list **head, char *path);
 char *get_last_file(list *l);
 int delete_last_element(list **head);
 int delete_by_key(list **head, char *k, int);
-void insert_tail(list **head, char *path);
 void print_q(list *list);
 void list_destroy(list **head);
 int list_contain_file(list *list, char *, int);

@@ -14,11 +14,10 @@
 
 
 void print_usage(const char *program_name) {
-    printf("Usage: %s -> -h -f [filename] -w [dirname] -W [file1][file2] -D [dirname] -r [file1][file2] -R[n] -d dirname -t [time] -l [file1][file2] -u [file1][file2] -c [file1][file2] -p\n", program_name); //inserire comandi supportati
+    printf("Usage: %s -> -h -f [filename] -w [fileName] -r [file1][file2] -R[n] -d dirname -t [time] -p\n", program_name); //Comandi supportati
 }
 
 fqueue *queue; //Coda delle richieste da inviare al server
-config_file *config; //File di config -- contiene il nome del sockname a cui connettersi (Se non viene specificato con -f)
 msg msg_t; //Struct di un messaggio - contiene data e size
 msg dir_name; //Struct di un dirname
 static int dFlag = 0, pFlag = 0; //Flag per sapere se ho letto -d o -p
@@ -65,11 +64,8 @@ void send_request () {
     memset(&msg_t, 0, sizeof(msg_t));
     n = pop(queue);  
     char opt = n->op_code;
-    //printf("OP CODE: %c\n", opt);
     switch (opt) {
         case 'r': { //Invio richiesta al server di lettura dei files tramite API readFile
-            //printf("Sono nella readFile lato client\n");
-            //int err_code;
             size_t size;
             char *path = n->data;
             if ((openFile(path, 3) != 0)) { //openFile senza specificare flags
@@ -102,7 +98,6 @@ void send_request () {
                     printf("readFile: Impossibile leggere il file\n");
                 break;
             }
-            //printf("FILE RICEVUTO: %s\n", msg_t.data);
             
             /*Debug Append*/
 
@@ -111,7 +106,7 @@ void send_request () {
                 printf("Agg appis\n");
             else
                 printf("Impossibile appendere\n");*/
-            //printf("dirnameAAA : %s\n", dir_name.data);
+    
             if (dir_name.data) { //Se non è NULL è perchè -d ci ha scritto dentro qualcosa, devo salvare il file in locale
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
                     if (pFlag != 0)
@@ -237,12 +232,7 @@ int main(int argc, char **argv) {
                 break;
         }
     }
-    /*if ((config = read_config("../test/config.txt")) == NULL) {
-        fprintf(stderr, "Errore nella lettura del file config.txt\n");
-        exit(EXIT_FAILURE);
-    } *///Lettura parametri dal file config
     //--- Connetto al socket --- 
-    //printf("%s\n", config->sock_name);
     struct timespec time;
     clock_gettime(CLOCK_REALTIME, &time);
     time.tv_sec += 5;
@@ -257,7 +247,7 @@ int main(int argc, char **argv) {
     }
     while (queue->head != NULL) { //Fino a quando la coda delle richieste non è vuota
         send_request(); //Invio la richiesta
-        usleep(sleep_time*1000);
+        usleep(sleep_time*1000); //Mi fermo per il tempo specificato in -t
     }
     if (closeConnection(sock_name) == 0) 
     {
@@ -277,7 +267,6 @@ int main(int argc, char **argv) {
         to_free--;
     }
     free(to_do);
-    free(config);
     free(queue);
     return 0;
 }

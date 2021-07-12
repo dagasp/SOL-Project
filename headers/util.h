@@ -42,9 +42,13 @@
 #define MAXBACKLOG   32
 #endif
 
-#if !defined (MB)
-#define MB 1024*1024 //1MB
-#endif
+enum FLAGS {
+  O_CREATE = 0,
+  O_LOCK = 1,
+  O_CREATE_OR_O_LOCK = 2,
+  NOFLAGS = 3
+};
+
 enum OP_CODE {
     OPENFILE = 0,
     READFILE = 1,

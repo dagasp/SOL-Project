@@ -1,5 +1,10 @@
 #include "list.h"
 
+
+/*Inserisce in testa alla lista
+* key - pathname del file
+* desc - descrittore associato al client
+*/
 void put_by_key(list **head, const char *key, int desc) {
     list *tmp = malloc(sizeof(list));
     if (!tmp) {
@@ -12,13 +17,15 @@ void put_by_key(list **head, const char *key, int desc) {
     *head = tmp;
 }
 
+/*Cerca il dato k nella lista e lo elimina
+* k - pathname del file
+* desc - descrittore associato al client
+*/
 int delete_by_key(list **head, char *k, int desc) {
     list *tmp = *head;
     list *prev = NULL;
     if (*head == NULL || head == NULL) return 0;
     while (tmp != NULL) {
-       // printf("QUEUE DATA: %s\n", (char*)tmp->data);
-        //printf("KEY DATA: %s\n", (char*)k);
         if ((strncmp(tmp->pathname, k, MAX_PATH) == 0) && tmp->descriptor == desc) {
             if (prev == NULL) {
                 *head = (*head)->next;
@@ -37,6 +44,11 @@ int delete_by_key(list **head, char *k, int desc) {
     return -1;
 }
 
+/*Cerca un path nella lista
+* path - pathname del file
+* desc - descrittore associato al client
+* Ritorna 0 in caso di successo, -1 in caso di fallimento
+*/
 int list_contain_file(list *l, char *path, int desc) {
     list *tmp = l;
     while (tmp != NULL) {
@@ -48,6 +60,9 @@ int list_contain_file(list *l, char *path, int desc) {
     return -1;
 }
 
+/*Inserisce un file nella lista, se non esiste già
+* path - pathname del file
+*/
 int insert_file(list **head, char *path) {
     list *curr;
     if (!path) return -1;
@@ -67,26 +82,7 @@ int insert_file(list **head, char *path) {
     return 0;
 }
 
-void insert_tail(list **head, char *path) {
-    list *curr = *head;
-    list *tmp = malloc(sizeof(list));
-    if (!tmp) {
-        fprintf(stderr, "Errore nella malloc\n");
-        return;
-    }
-    strncpy(tmp->pathname, path, MAX_PATH);
-    tmp->next = NULL;
-    if (*head == NULL) {
-        *head = tmp;
-        return;
-    }
-    while (curr->next != NULL) {
-        curr = curr->next;
-    }
-    curr->next = tmp;
-    return;
-}
-
+/*Ritorna il file in coda alla lista*/
 char *get_last_file(list *l) {
     list *curr = l;
     list *next = curr->next;
@@ -99,6 +95,7 @@ char *get_last_file(list *l) {
     else return NULL;
 }
 
+/*Cancella il file in coda alla lista*/
 int delete_last_element(list **head) {
     list *curr = *head;
     list *prev = NULL;
@@ -117,6 +114,7 @@ int delete_last_element(list **head) {
     return 0;
 }
 
+/*Stampa la lista*/
 void print_q(list *list) {
     while (list != NULL) {
         printf("PATHNAME: %s\n", (char*)list->pathname);
@@ -125,6 +123,7 @@ void print_q(list *list) {
     }
 }
 
+/*Distrugge la lista*/
 void list_destroy(list **head) {
     list *curr = *head;
     list *next = NULL;

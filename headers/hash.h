@@ -13,7 +13,6 @@
 #include <stdio.h>
 #include <pthread.h>
 #include "util.h"
-#include "api.h"
 #include "list.h"
 
 #if defined(c_plusplus) || defined(__cplusplus)

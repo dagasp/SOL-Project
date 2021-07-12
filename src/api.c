@@ -11,7 +11,6 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
         errno = EINVAL;
         return -1;
     }
-    //char *tmp_dirname = calloc(sizeof(char), MAX_PATH);
      //Controllo che la cartella esista
     char *tmp_dirname = get_path(dirname); //Prendo path assoluto, se esiste
     if (!tmp_dirname) {
@@ -19,14 +18,11 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
             fprintf(stderr, "Impossibile creare la cartella %s\n", dirname);
             return -1;
        }
-       tmp_dirname = get_path(dirname);
-       //strcpy(tmp_dirname, dirname);        
+       tmp_dirname = get_path(dirname);        
     }
-    //printf("%s\n", tmp_dirname);
     FILE *stream = NULL;
     strcat(tmp_dirname, "/");
     char *fileName = basename(pathname); //Prende il nome del file da pathname
-    //printf("RET: %s\n", ret);
     if ((stream = fopen(strcat(tmp_dirname, fileName), "w")) == NULL) { 
             fprintf(stderr, "Errore nell'apertura del file\n");
             free(tmp_dirname);
@@ -84,7 +80,6 @@ Ritorna 0 in caso di successo, -1 in caso di fallimento, errno viene settato opp
 */
 
 int openFile(const char *pathname, int flags) {
-    //printf("OPEN FILE\n");
     if (!pathname) {
         fprintf(stderr, "openFile: Pathname non valido\n");
         errno = EINVAL;
@@ -100,11 +95,9 @@ int openFile(const char *pathname, int flags) {
     int n, rep_code;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Errore nell'invio della richiesta di apertura file\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &rep_code, sizeof(int)), "Errore, impossibile ricevere risposta dal Server\n", "");
-    //printf("FEEDBACK: %d\n", rep_code);
     if (rep_code == FAILED) 
         return FAILED;
     return SUCCESS;
-    //da settare errno
 }
 
 /*Legge tutto il contenuto del file dal server (se esiste) ritornando un puntatore ad un'area allocata sullo heap nel
@@ -128,9 +121,7 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     client_op.client_desc = fd_skt;
     char *realPath = get_path(pathname);
     memcpy(client_op.pathname, realPath, strlen(realPath)+1);
-    //strcpy(client_op.pathname, pathname);
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Errore nell'invio della richiesta di lettura\n", "");
-    //Farsi mandare dal server la strlen del buffer da scrivere ---
     SYSCALL_RETURN("readn", n, readn(fd_skt, (void*)&server_rep, sizeof(server_reply)), "Errore - impossibile ricevere risposta dal server\n", "");
     if (server_rep.reply_code == FAILED) { //Il server ritorna un errore, non ha letto il file
         fprintf(stderr, "Errore - il server non è riuscito a leggere il file\n");
@@ -141,7 +132,6 @@ int readFile(const char* pathname, void** buf, size_t* size) {
         *size = strlen(*buf);
     }
     return 0;
-    //settare errno e occuparsi di questo -> In caso di errore, ‘buf‘e ‘size’ non sono validi
 }
 
 /*Richiede al server la lettura di ‘N’ files qualsiasi da memorizzare nella directory ‘dirname’ lato client. Se il server
@@ -162,7 +152,6 @@ int readNFiles(int N, const char *dirname) { //Controllare se dirname = NULL, in
         
     int files_letti = 0;
     int n;
-    //printf("Sono dentro l'API readNFiles\n");
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
     printf("FILE DA LEGGERE: %d\n", files_letti);
@@ -249,12 +238,7 @@ int closeConnection(const char *sockname) {
         errno = EINVAL;
         return -1;
     }
-    //client_operations client_op;
-    //memset(&client_op, 0, sizeof(client_op));
-    //client_op.op_code = CLOSECONNECTION;
     int n;
-    //SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_op)), "Impossibile inviare richiesta al server\n", "");
-    //SYSCALL_RETURN("readn", n, readn(fd_skt, &feedback, sizeof(int)), "Impossibile ricevere feedback dal server\n", "");
     SYSCALL_RETURN("close", n, close(fd_skt), "Impossibile chiudere il socket associato\n", "");
     return 0;
 }
@@ -285,14 +269,14 @@ int writeFile (char *file_name) {
         fprintf(stderr, "Impossibile leggere dal file\n");
         SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
     }
+    SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
     client_op.size = n_read;
     client_op.op_code = WRITEFILE;
     strcpy(client_op.pathname, path);
     memcpy(client_op.data, to_read, n_read);
     free(to_read);
     int fb;
-    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di chiusura del file al server\n", "");
+    SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di write al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &fb, sizeof(int)), "Impossibile ricevere risposta dal server\n", "");
-    SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
     return fb;
 }

@@ -108,7 +108,7 @@ void send_request () {
                 printf("Impossibile appendere\n");*/
     
             if (dir_name.data) { //Se non è NULL è perchè -d ci ha scritto dentro qualcosa, devo salvare il file in locale
-                if (writeToFile((char*)n->data, msg_t.data, dir_name.data) != 0) {
+                if (writeToFile((char*)n->data, msg_t.data, dir_name.data, size) != 0) {
                     if (pFlag != 0)
                         fprintf(stderr, "writeToFile: Non è stato possibile scrivere sui files\n");
                     free(msg_t.data);
@@ -157,13 +157,17 @@ void send_request () {
             }
             break;
         }
+        default:
+            break;
     }
     free(n);
 }
 
 int main(int argc, char **argv) {
     char **to_do = NULL;
+    char **to_write = NULL;
     int to_free = 0;
+    int to_free_write = 0;
     queue = create();
     long n_files = 0;
      if (argc == 1) {
@@ -193,19 +197,30 @@ int main(int argc, char **argv) {
                     i++;
                     how_many--;
                 }
-                //insert(queue, 'r', (void*)data);
                 rFlag = 1;
                 i = 0;
                 break;
             }
             case 'R': {
+                if (optarg != NULL) {
+                    n_files = atoi(optarg);
+                }
                 insert(queue, 'R', (void*)n_files);
                 RFlag = 1;
                 break;
             }
-            case 'w':
-                insert(queue, 'w', (void*)optarg);
+            case 'w': {
+                unsigned int hM;
+                to_write = tokenize_args(optarg, &hM);
+                int i = 0;
+                to_free_write = hM;
+                while (hM > 0) {
+                    insert(queue, 'w', (void*)to_write[i]);
+                    i++;
+                    hM--;
+                }
                 break;
+            }
             case 'd':
                 if (rFlag == 0 && RFlag == 0) {
                     fprintf(stderr, "Errore, il comando -d va usato congiuntamente a -r o -R\n");
@@ -266,6 +281,13 @@ int main(int argc, char **argv) {
          i++;
         to_free--;
     }
+    i = 0;
+    while (to_free_write > 0) {
+        free(to_write[i]);
+        i++;
+        to_free_write--;
+    }
+    free(to_write);
     free(to_do);
     free(queue);
     return 0;

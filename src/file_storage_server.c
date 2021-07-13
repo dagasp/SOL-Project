@@ -254,9 +254,10 @@ void threadWorker(void *arg) {
         LOCK(&openFileLock);
         if (list_contain_file(open_file, client_op.pathname, client_op.client_desc) == 0) { //Se il file è nella lista dei file aperti da quel client, lo copio
             UNLOCK(&openFileLock);
-            msg.size = strlen(msg.data);
+            msg.size = icl_hash_get_file_size(hTable, client_op.pathname);
             server_rep.reply_code = SUCCESS;
-            memcpy(server_rep.data, msg.data, msg.size);
+            memcpy(server_rep.data, msg.data, msg.size+1);
+            server_rep.size = msg.size;
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
                 perror("writen");
                 break;
@@ -313,16 +314,19 @@ void threadWorker(void *arg) {
             }
             strncpy(path, client_op.pathname, MAX_PATH); //Copio il path
             memcpy(msg.data, client_op.data, client_op.size+1); //Copio il contenuto del file
+            LOCK(&memoryLock); //Sto per modificare la memoria nella insert, prendo la lock
             icl_entry_t* tmp = icl_hash_insert(hTable, (void*)path, (void*)msg.data, client_op.size); //Inserisco il file
             if (tmp == NULL) { //File già presente o errore interno
                 fprintf(stderr, "SERVER: Impossibile creare il file\n");
                 int fb = FAILED;
+                UNLOCK(&memoryLock);
                 if ((r = writen(connFd, &fb, sizeof(int))) < 0) { 
                     perror("writenWRITEFILE1");
                     break;     
             }
                 break;
             }
+            UNLOCK(&memoryLock);
             LOCK(&fileListLock);
             int rep = insert_file(&file_list, client_op.pathname);
             UNLOCK(&fileListLock); 
@@ -352,20 +356,24 @@ void threadWorker(void *arg) {
             }
             UNLOCK(&openFileLock);
             check_memory_FIFO(client_op.size);
+            LOCK(&memoryLock); //Sto per modificare la dimensione dello storage, prendo la lock
                 if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
                     int fb = SUCCESS;
+                    UNLOCK(&memoryLock);
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback append");
                             break;
                         }  
-            }
+                }
                 else {
                     int fb = FAILED;
+                    UNLOCK(&memoryLock);
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen negative feedback append");
                             break;
                     }  
-                } 
+                }
+            UNLOCK(&memoryLock); 
             break;
         case CLOSEFILE:
                 LOCK(&openFileLock);

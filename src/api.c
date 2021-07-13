@@ -5,12 +5,13 @@ static long fd_skt;
 /*Scrive il contenuto di un file sul disco. Se dirname non esiste, verrà creata.
 Ritorna 0 in caso di successo, -1 in caso di errore.*/
 
-int writeToFile(char *pathname, char *content, const char *dirname) {
+int writeToFile(char *pathname, char *content, const char *dirname, size_t fileSize) {
     if (!pathname) {
         fprintf(stderr, "writeToFile: Pathname non valido\n");
         errno = EINVAL;
         return -1;
     }
+    //printf("%ld\n", fileSize);
      //Controllo che la cartella esista
     char *tmp_dirname = get_path(dirname); //Prendo path assoluto, se esiste
     if (!tmp_dirname) {
@@ -23,12 +24,17 @@ int writeToFile(char *pathname, char *content, const char *dirname) {
     FILE *stream = NULL;
     strcat(tmp_dirname, "/");
     char *fileName = basename(pathname); //Prende il nome del file da pathname
-    if ((stream = fopen(strcat(tmp_dirname, fileName), "w")) == NULL) { 
+    if ((stream = fopen(strcat(tmp_dirname, fileName), "wb")) == NULL) { 
             fprintf(stderr, "Errore nell'apertura del file\n");
             free(tmp_dirname);
             return -1;
     }
-    fprintf(stream, "%s", (char*)content);
+    //fprintf(stream, "%s", (char*)content);
+    int err;
+    if (fwrite(content, sizeof(char), fileSize, stream) < 0) {
+        SYSCALL_RETURN("fclose", err, fclose(stream), "Impossibile chiudere il file\n", "");
+        return -1;
+    }
     if (fclose(stream) != 0) {
         fprintf(stderr, "Errore nella chiusura del file\n");
         free(tmp_dirname);
@@ -128,8 +134,8 @@ int readFile(const char* pathname, void** buf, size_t* size) {
         return -1;
     } 
     else {
-        memcpy(*buf, server_rep.data, strlen(server_rep.data)+1);
-        *size = strlen(*buf);
+        memcpy(*buf, server_rep.data, server_rep.size+1);
+        *size = server_rep.size;
     }
     return 0;
 }
@@ -154,13 +160,13 @@ int readNFiles(int N, const char *dirname) { //Controllare se dirname = NULL, in
     int n;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
-    printf("FILE DA LEGGERE: %d\n", files_letti);
+    //printf("FILE DA LEGGERE: %d\n", files_letti);
     for (int i = 0; i < files_letti; i++) {
         SYSCALL_RETURN("readn", n, readn(fd_skt, &server_rep, sizeof(server_reply)), "Errore - impossibile ricevere risposta dal server\n", "");
         //printf("PATH RICEVUTO: %s\n", server_rep.pathname);
         //printf("CONTENT RICEVUTO: %s\n", server_rep.data);
         if (dirname) { //Se ho ricevuto il comando -d scrivo su file
-            if (writeToFile(server_rep.pathname, server_rep.data, dirname) != 0) {
+            if (writeToFile(server_rep.pathname, server_rep.data, dirname, server_rep.size) != 0) {
                 fprintf(stderr, "Errore nella scrittura dei files\n");
                 return -1;
             } 
@@ -269,6 +275,7 @@ int writeFile (char *file_name) {
         fprintf(stderr, "Impossibile leggere dal file\n");
         SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
     }
+    //printf("%ld\n", n_read);
     SYSCALL_EXIT("fclose", n, fclose(fp), "Impossibile chiudere il file\n", "");
     client_op.size = n_read;
     client_op.op_code = WRITEFILE;

@@ -94,6 +94,10 @@ int openFile(const char *pathname, int flags) {
     client_operations client_op;
     memset(&client_op, 0, sizeof(client_operations));
     char *realPath = get_path(pathname);
+    if (!realPath) {
+        fprintf(stderr, "openFile: Pathname non trovato\n");
+        return -1;
+    } 
     client_op.flags = flags;
     client_op.op_code = OPENFILE;
     client_op.client_desc = fd_skt;
@@ -126,6 +130,10 @@ int readFile(const char* pathname, void** buf, size_t* size) {
     client_op.op_code = READFILE;
     client_op.client_desc = fd_skt;
     char *realPath = get_path(pathname);
+    if (!realPath) {
+        fprintf(stderr, "readFile: Pathname non trovato\n");
+        return -1;
+    } 
     memcpy(client_op.pathname, realPath, strlen(realPath)+1);
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Errore nell'invio della richiesta di lettura\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, (void*)&server_rep, sizeof(server_reply)), "Errore - impossibile ricevere risposta dal server\n", "");
@@ -160,11 +168,8 @@ int readNFiles(int N, const char *dirname) { //Controllare se dirname = NULL, in
     int n;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di leggere N files al server\n", "");
     SYSCALL_RETURN("readn", n, readn(fd_skt, &files_letti, sizeof(int)), "Errore - impossibile ricevere risposta dal server\n", ""); 
-    //printf("FILE DA LEGGERE: %d\n", files_letti);
     for (int i = 0; i < files_letti; i++) {
         SYSCALL_RETURN("readn", n, readn(fd_skt, &server_rep, sizeof(server_reply)), "Errore - impossibile ricevere risposta dal server\n", "");
-        //printf("PATH RICEVUTO: %s\n", server_rep.pathname);
-        //printf("CONTENT RICEVUTO: %s\n", server_rep.data);
         if (dirname) { //Se ho ricevuto il comando -d scrivo su file
             if (writeToFile(server_rep.pathname, server_rep.data, dirname, server_rep.size) != 0) {
                 fprintf(stderr, "Errore nella scrittura dei files\n");
@@ -200,13 +205,15 @@ int appendToFile(const char *pathname, void *buf, size_t size, const char *dirna
     server_reply server_rep;
     memset(&client_op, 0, sizeof(client_operations));
     memset(&server_rep, 0, sizeof(server_reply));
+    char *realPath = get_path(pathname);
+    if (!realPath) {
+        fprintf(stderr, "appendToFile: Pathname non trovato\n");
+        return -1;
+    } 
     client_op.op_code = APPENDTOFILE;
     client_op.size = size;
     client_op.client_desc = fd_skt;
-    if (dirname) //Devo salvare i file eventualmente espulsi, lo dico al server
-        client_op.flags = 1;
-    else client_op.flags = 0;
-    strcpy(client_op.pathname, pathname);
+    memcpy(client_op.pathname, realPath, strlen(realPath)+1);
     memcpy(client_op.data, buf, size);
     int n, fb;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di append al server\n", "");
@@ -228,6 +235,10 @@ int closeFile(const char *pathname) {
     client_op.op_code = CLOSEFILE;
     client_op.client_desc = fd_skt;
     char *realPath = get_path(pathname);
+    if (!realPath) {
+        fprintf(stderr, "closeFile: Pathname non trovato\n");
+        return -1;
+    } 
     strcpy(client_op.pathname, realPath);
     int n, fb;
     SYSCALL_RETURN("writen", n, writen(fd_skt, (void*)&client_op, sizeof(client_operations)), "Impossibile inviare richiesta di chiusura del file al server\n", "");
@@ -260,6 +271,10 @@ int writeFile (char *file_name) {
         return -1;
     }
     char *path = get_path(file_name);
+    if (!path) {
+        fprintf(stderr, "writeFile: Pathname non trovato\n");
+        return -1;
+    } 
     client_operations client_op;
     memset(&client_op, 0, sizeof(client_operations));
     char *to_read = malloc(sizeof(char)*MAX_FILE_SIZE);

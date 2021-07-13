@@ -102,10 +102,10 @@ void send_request () {
             /*Debug Append*/
 
             /*char *append = "Incredibile prova di append, fantastica";
-            if (appendToFile("pippo", (void*)append, 40, "files") == 0)
-                printf("Agg appis\n");
+            if (appendToFile("./files/file1.txt", (void*)append, 40, NULL) == 0)
+                printf("appendToFile: Agg appis\n");
             else
-                printf("Impossibile appendere\n");*/
+                printf("appendToFile: Impossibile appendere\n");*/
     
             if (dir_name.data) { //Se non è NULL è perchè -d ci ha scritto dentro qualcosa, devo salvare il file in locale
                 if (writeToFile((char*)n->data, msg_t.data, dir_name.data, size) != 0) {
@@ -144,7 +144,7 @@ void send_request () {
             }
             break;
         }
-        case 'w': {
+        case 'W': {
             int rep = writeFile(n->data);
             if (rep == 0) {
                 if (pFlag != 0) {
@@ -209,13 +209,13 @@ int main(int argc, char **argv) {
                 RFlag = 1;
                 break;
             }
-            case 'w': {
+            case 'W': {
                 unsigned int hM;
                 to_write = tokenize_args(optarg, &hM);
                 int i = 0;
                 to_free_write = hM;
                 while (hM > 0) {
-                    insert(queue, 'w', (void*)to_write[i]);
+                    insert(queue, 'W', (void*)to_write[i]);
                     i++;
                     hM--;
                 }

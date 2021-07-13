@@ -11,11 +11,11 @@ valgrind --leak-check=full --show-leak-kinds=all $SERVER_CMD & #Avvia il server 
 pid=$!
 sleep 2s
 
-#Scrive due file nel server con un ritardo di 200ms tra una richiesta e l'altra
-$CLIENT_CMD -f cs_sock -w ./files/file10.txt -w ./files/file11.txt -t 200 -p
+#Scrive tre file nel server con un ritardo di 200ms tra una richiesta e l'altra
+$CLIENT_CMD -f cs_sock -w ./files/file10.txt -w ./files/omam.jpg,./files/file2.txt -t 200 -p
 
-#Legge un file con -r e 1 file con -R1 con -R con 200ms tra una richiesta e l'altra, salvando i files letti in locale
-$CLIENT_CMD -f cs_sock -r ./files/file10.txt -d SaveTheFileHere -t 200 -p 
+#Legge un file con -r e uno con R1, con 200ms tra una richiesta e l'altra, salvando i files letti in locale
+$CLIENT_CMD -f cs_sock -r ./files/file10.txt -R1 -d SaveTheFileHere -t 200 -p 
 
 #Legge tutti i file con -R salvando i files letti in locale e richiedendo la stampa delle operazioni effettuate con -p
 $CLIENT_CMD -f cs_sock -R -d GetAllFiles -p 

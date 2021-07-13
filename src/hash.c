@@ -383,9 +383,11 @@ icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
     if(!ht) return -1;
     int file_readed = 0;
     for(i=0; i<ht->nbuckets; i++) {
+        if (file_readed == n_of_files) return 0; //Ho finito, esco
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {
-            if(curr->key && file_readed <= n_of_files) {
+            if (file_readed == n_of_files) return 0; //Ho finito, esco
+            if(curr->key) {
                 strcpy(server_rep.pathname, (char*)curr->key);
                 memcpy(server_rep.data, curr->data, curr->fileSize+1);
                 server_rep.size = curr->fileSize; //Prendo la size del file

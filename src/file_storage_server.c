@@ -677,7 +677,7 @@ int main (int argc, char **argv) {
 			    fprintf(stderr, "SERVER: Impossibile aggiungere al threadPool\n");
 		    } 
             else { //Non ci sono thread disponibili - spawno un thread in modalità detached
-			    fprintf(stderr, "SERVER: Errore - nessun thread disponibile, spawno un thread in modalità detached\n");
+			    printf("SERVER: Nessun thread disponibile, spawno un thread in modalità detached\n");
                 int rep;
                 rep = spawnThread(threadWorker, (void*)args);
                 if (rep != 0) {

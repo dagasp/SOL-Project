@@ -174,7 +174,6 @@ int check_memory_FIFO(size_t new_size) {
             return -1;
         }
         UNLOCK(&fileListLock); 
-        UNLOCK(&memoryLock);
     }
     UNLOCK(&memoryLock);
     return how_many;
@@ -785,6 +784,7 @@ int main (int argc, char **argv) {
     icl_hash_dump_2(logFile, hTable);
     fflush(logFile);
     UNLOCK(&logLock);
+    printf("SERVER: FILE DI LOG CREATO\n");
     if (fclose(logFile) != 0) {
         fprintf(stderr, "SERVER: Errore nella chiusura del file di log\n");
     }

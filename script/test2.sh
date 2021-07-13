@@ -13,7 +13,7 @@ sleep 2s
 
 #Prova a scrivere 15 files diversi
 for i in {1..15}; do
-    $CLIENT_CMD -f cs_sock -w ./files/file$i.txt
+    $CLIENT_CMD -f cs_sock -W ./files/file$i.txt
 done
 
 sleep 2s

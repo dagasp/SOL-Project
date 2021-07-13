@@ -12,7 +12,7 @@ pid=$!
 sleep 2s
 
 #Scrive tre file nel server con un ritardo di 200ms tra una richiesta e l'altra
-$CLIENT_CMD -f cs_sock -w ./files/file10.txt -w ./files/omam.jpg,./files/file2.txt -t 200 -p
+$CLIENT_CMD -f cs_sock -W ./files/file10.txt -W ./files/omam.jpg,./files/file2.txt -t 200 -p
 
 #Legge un file con -r e uno con R1, con 200ms tra una richiesta e l'altra, salvando i files letti in locale
 $CLIENT_CMD -f cs_sock -r ./files/file10.txt -R1 -d SaveTheFileHere -t 200 -p 

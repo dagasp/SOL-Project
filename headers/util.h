@@ -81,13 +81,13 @@ typedef struct client_operations {
 typedef struct server_reply {
     char pathname[MAX_PATH];
     char data[MAX_FILE_SIZE];
-    unsigned int size;
+    size_t size;
     unsigned int reply_code;
     int n_files_letti;
 } server_reply;
 
 typedef struct msg {
-  char *data;
+  void *data;
   size_t size;
 } msg;
 

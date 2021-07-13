@@ -30,7 +30,7 @@
 
 /*API d'appoggio al Client*/
 
-int writeToFile(char *pathname, char *content, const char *dirname);
+int writeToFile(char *pathname, char *content, const char *dirname, size_t size);
 
 int openConnection(const char *sockname, int msec, const struct timespec abstime);
 

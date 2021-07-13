@@ -43,6 +43,10 @@ pthread_mutex_t openFileLock = PTHREAD_MUTEX_INITIALIZER;
 list *file_list; //Lista di tutti i file
 pthread_mutex_t fileListLock = PTHREAD_MUTEX_INITIALIZER;
 
+//File di log e la sua lock
+FILE *logFile = NULL;
+pthread_mutex_t logLock = PTHREAD_MUTEX_INITIALIZER;
+
 //Pool di threadpool
 threadpool_t *pool = NULL;
 
@@ -58,15 +62,20 @@ int updatemax(fd_set set, int fdmax) {
     	return -1;
 }
 
+/*Variabili globali utili per il log*/
+int how_many_times; //Conta quante volte viene invocato l'algoritmo di rimpiazzamento
+long max_files; //Conta il massimo numero di files presenti contemporaneamente
+float max_size_raggiunta; //Conta la dimensione massima raggiunta dallo storage
 
 /*
 *Controlla che il file storage possa contenere almeno un altro file, in caso contrario toglie il primo file inserito (FIFO)
 *
 */
+
 int check_numOfFiles_FIFO() { 
     LOCK(&memoryLock);
     if (hTable->nentries + 1 > hTable->max_files) { //Devo eliminare un file
-        printf("SERVER: Ho raggiunto il massimo numero di file, elimino il primo inserito\n");
+        //printf("SERVER: Ho raggiunto il massimo numero di file, elimino il primo inserito\n");
         LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list); //Prendo il primo inserito - FIFO
         if (!to_delete) {
@@ -74,7 +83,16 @@ int check_numOfFiles_FIFO() {
             UNLOCK(&fileListLock);
             return -1;
         } 
+        
+        LOCK(&logLock);
+        fprintf(logFile,"File %s eliminato dall'algoritmo di rimpiazzamento\n", to_delete);
+        fflush(logFile);
+        UNLOCK(&logLock);
         int rep;
+        if (max_files < hTable->nentries)
+            max_files = hTable->nentries; //Sto per eliminare un file, controllo se il numero di file presenti attualmente è il massimo, in quel caso lo prendo -- per il log
+        if (max_size_raggiunta < hTable->curr_size) //Stessa cosa per la size
+            max_size_raggiunta = hTable->curr_size;
         rep = icl_hash_delete(hTable, (void*)to_delete, free, free); //Lo tolgo sia dalla hashTable che dalla lista dei file
         if (rep != 0) {
             fprintf(stderr, "SERVER: Errore - Impossibile eliminare file\n");
@@ -82,7 +100,7 @@ int check_numOfFiles_FIFO() {
             UNLOCK(&memoryLock);
             return -1;
         } 
-        printf("SERVER: File eliminato correttamente\n");
+        //printf("SERVER: File eliminato correttamente\n");
         rep = delete_last_element(&file_list);
         if (rep != 0) {
             fprintf(stderr, "SERVER: Errore - Impossibile eliminare file dalla lista\n");
@@ -90,6 +108,7 @@ int check_numOfFiles_FIFO() {
             UNLOCK(&memoryLock);
             return -1;
         }
+        how_many_times += 1;
         UNLOCK(&fileListLock);
         UNLOCK(&memoryLock);
         return 0;
@@ -105,17 +124,22 @@ int check_numOfFiles_FIFO() {
 *@param new_size - il peso in byte del file da inserire
 */
 
+
 static int how_many = 0;
 int check_memory_FIFO(size_t new_size) {
     if (new_size == 0) return 0; //Se il file da inserire è vuoto, esco per inserirlo subito
     LOCK(&memoryLock);
     if (new_size > hTable->max_size) {
-        fprintf(stderr, "SERVER: Errore, il nuovo contenuto sarebbe più grande della dimensione massima della memoria\n");
+        //fprintf(stderr, "SERVER: Errore, il nuovo contenuto sarebbe più grande della dimensione massima della memoria\n");
+        LOCK(&logLock);
+        fprintf(logFile,"Errore, il nuovo contenuto da %ld bytes sarebbe più grande della dimensione massima della memoria\n", new_size);
+        fflush(logFile);
+        UNLOCK(&logLock); 
         UNLOCK(&memoryLock);
         return -1;
     } 
     while (hTable->curr_size + new_size > hTable->max_size) { //Memoria superata-> ho bisogno di liberare spazio
-        printf("SERVER: Ho raggiunto la dimensione massima della memoria, elimino qualcosa...\n");
+        //printf("SERVER: Ho raggiunto la dimensione massima della memoria, elimino qualcosa...\n");
         LOCK(&fileListLock);
         char *to_delete = get_last_file(file_list);
         if (!to_delete) {
@@ -123,7 +147,15 @@ int check_memory_FIFO(size_t new_size) {
             UNLOCK(&fileListLock);
             return -1;
         }
+        if (max_files < hTable->nentries)
+            max_files = hTable->nentries; //Sto per eliminare un file, controllo se il numero di file presenti attualmente è il massimo, in quel caso lo prendo -- per il log
+        if (max_size_raggiunta < hTable->curr_size) //Stessa cosa per la size
+            max_size_raggiunta = hTable->curr_size;
         int rep;
+        LOCK(&logLock);
+        fprintf(logFile,"File %s eliminato dall'algoritmo di rimpiazzamento\n", to_delete);
+        fflush(logFile);
+        UNLOCK(&logLock);
         rep = icl_hash_delete(hTable, (void*)to_delete, free, free); //Lo tolgo sia dalla hashTable che dalla lista dei file 
         if (rep != 0) {
             fprintf(stderr, "SERVER: Errore - non è stato possibile eliminare il file\n");
@@ -131,8 +163,9 @@ int check_memory_FIFO(size_t new_size) {
             UNLOCK(&memoryLock);
             return -1;
         }
-        printf("SERVER: File eliminato correttamente\n");
+        //printf("SERVER: File eliminato correttamente\n");
         how_many++;
+        how_many_times += 1;
         rep = delete_last_element(&file_list);
         if (rep != 0) {
             fprintf(stderr, "SERVER: Errore nell'eliminare il file dalla lista\n");
@@ -176,6 +209,7 @@ void threadWorker(void *arg) {
            if (client_op.flags == O_CREATE) {
                     check_numOfFiles_FIFO(); //Controllo che ci sia spazio per un altro file
                     icl_entry_t* tmp = icl_hash_insert(hTable, (void*)client_op.pathname, client_op.data, 0); //Creo il nuovo file
+                    max_files += max_files; //Aumento il numero massimo di file presenti -- per il log
                     if (tmp == NULL) { //Ho ricevuto un errore o il file era già presente
                         int fb = FAILED;
                         fprintf(stderr, "SERVER: File non creato\n");
@@ -185,6 +219,10 @@ void threadWorker(void *arg) {
                         }
                         break;
                     }
+                    LOCK(&logLock);
+                    fprintf(logFile, "File %s inserito nello storage\n", client_op.pathname);
+                    fflush(logFile);
+                    UNLOCK(&logLock);
                         LOCK(&fileListLock);
                         if (insert_file(&file_list, client_op.pathname) != 0) //Metto il file nella lista di tutti i file 
                             printf("SERVER: File già presente in coda, non inserito\n");
@@ -231,6 +269,10 @@ void threadWorker(void *arg) {
                     LOCK(&openFileLock);
                     put_by_key(&open_file,client_op.pathname,client_op.client_desc); //Lo inserisco nella lista dei files aperti
                     UNLOCK(&openFileLock);
+                    LOCK(&logLock);
+                    fprintf(logFile, "File %s aperto da client %ld\n", client_op.pathname, client_op.client_desc);
+                    fflush(logFile);
+                    UNLOCK(&logLock);
                     int fb = SUCCESS;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                         perror("writen");
@@ -258,6 +300,10 @@ void threadWorker(void *arg) {
             server_rep.reply_code = SUCCESS;
             memcpy(server_rep.data, msg.data, msg.size+1);
             server_rep.size = msg.size;
+            LOCK(&logLock);
+            fprintf(logFile, "File %s di %ld bytes inviato al client %ld\n", client_op.pathname, msg.size, client_op.client_desc);
+            fflush(logFile);
+            UNLOCK(&logLock);
             if ((r = writen(connFd, (void*)&server_rep, sizeof(server_reply))) < 0) {
                 perror("writen");
                 break;
@@ -283,7 +329,10 @@ void threadWorker(void *arg) {
                     break;     
             }
             if (icl_hash_dump(connFd, hTable, available_files) == 0) { //Operazione andata a buon fine
-                printf("SERVER: File inviati correttamente al client\n");
+                LOCK(&logLock);
+                fprintf(logFile, "Inviati %d files al client\n", available_files);
+                fflush(logFile);
+                UNLOCK(&logLock);
             }
             else fprintf(stderr, "SERVER: Non è stato possibile inviare i files al client\n");
         }
@@ -293,7 +342,10 @@ void threadWorker(void *arg) {
                     break;     
             }
             if (icl_hash_dump(connFd, hTable, n_of_files) == 0) { //File letti correttamente
-                printf("SERVER: File inviati correttamente\n");  
+                LOCK(&logLock);
+                fprintf(logFile,"Inviati %d files al client\n", n_of_files);
+                fflush(logFile);
+                UNLOCK(&logLock);  
             }
             //else printf("NOT OK \n");
         }        
@@ -329,7 +381,15 @@ void threadWorker(void *arg) {
             UNLOCK(&memoryLock);
             LOCK(&fileListLock);
             int rep = insert_file(&file_list, client_op.pathname);
-            UNLOCK(&fileListLock); 
+            UNLOCK(&fileListLock);
+            if (max_files < hTable->nentries)
+                max_files = hTable->nentries; //controllo se il numero di file presenti attualmente è il massimo, in quel caso lo prendo -- per il log
+            if (max_size_raggiunta < hTable->curr_size) //Stessa cosa per la size
+                max_size_raggiunta = hTable->curr_size;
+            LOCK(&logLock);
+            fprintf(logFile,"File %s da %ld bytes inserito nello storage\n", client_op.pathname, client_op.size);
+            fflush(logFile);
+            UNLOCK(&logLock);  
             if (rep != 0) { //Non sono riuscito a mettere il file in lista o era già presente
                 int fb = FAILED;
                 fprintf(stderr, "SERVER: Errore - file non inserito in lista\n");
@@ -340,7 +400,7 @@ void threadWorker(void *arg) {
                 break;
             }
             //Se sono arrivato fino a qui, ho avuto successo, invio feedback positivo
-            icl_hash_dump_2(stdout, hTable);
+            //icl_hash_dump_2(stdout, hTable);
             int fb = SUCCESS;
             if ((r = writen(connFd, &fb, sizeof(int))) < 0) { 
                     perror("writenWRITEFILE2");
@@ -358,6 +418,10 @@ void threadWorker(void *arg) {
             check_memory_FIFO(client_op.size);
             LOCK(&memoryLock); //Sto per modificare la dimensione dello storage, prendo la lock
                 if (append(hTable, (void*)client_op.pathname, client_op.data, client_op.size) == 0) {
+                    LOCK(&logLock);
+                    fprintf(logFile,"Ho scritto %ld bytes sul file %s\n", client_op.size, client_op.pathname);
+                    fflush(logFile);
+                    UNLOCK(&logLock); 
                     int fb = SUCCESS;
                     UNLOCK(&memoryLock);
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
@@ -379,6 +443,10 @@ void threadWorker(void *arg) {
                 LOCK(&openFileLock);
                 if (delete_by_key(&open_file, client_op.pathname, client_op.client_desc) == 0) { //File chiuso correttamente 
                     UNLOCK(&openFileLock);
+                    LOCK(&logLock);
+                    fprintf(logFile,"File %s chiuso da client %ld\n", client_op.pathname, client_op.client_desc);
+                    fflush(logFile);
+                    UNLOCK(&logLock); 
                     int fb = SUCCESS;
                     if ((r = writen(connFd, &fb, sizeof(int))) < 0) {
                             perror("writen positive feedback closeFile");
@@ -458,8 +526,17 @@ int main (int argc, char **argv) {
         fprintf(stderr, "Errore nella lettura del file config.txt\n");
         exit(EXIT_FAILURE);
     }
+    logFile = fopen(conf->log_file, "w");
+    if (logFile == NULL) {
+        fprintf(stderr, "Impossibile aprire il file di log");
+        return -1;
+    }
+    how_many_times = 0;
+    max_files = 0;
+    max_size_raggiunta = 0;
     hTable = icl_hash_create(conf->num_of_files, NULL, NULL, conf->memory_space, conf->num_of_files);
 
+    
 
     /*Debug inserimento file server*/
     /*insert_file(&file_list, "/mnt/c/Users/davyx/files/gianni");
@@ -633,8 +710,13 @@ int main (int argc, char **argv) {
                 }
                 return -1;
 		    }
-			else
-				printf("SERVER: Client connesso\n");
+			else {
+                LOCK(&logLock);
+                fprintf(logFile, "Nuovo client connesso\n");
+                fflush(logFile);
+                UNLOCK(&logLock);
+            }
+				//printf("SERVER: Client connesso\n");
 			FD_SET(connfd, &set); //Aggiunto fd al set
 			if (connfd > fdmax)
 				fdmax = connfd;
@@ -677,7 +759,11 @@ int main (int argc, char **argv) {
 			    fprintf(stderr, "SERVER: Impossibile aggiungere al threadPool\n");
 		    } 
             else { //Non ci sono thread disponibili - spawno un thread in modalità detached
-			    printf("SERVER: Nessun thread disponibile, spawno un thread in modalità detached\n");
+			    //printf("SERVER: Nessun thread disponibile, spawno un thread in modalità detached\n");
+                LOCK(&logLock);
+                fprintf(logFile, "Nessun thread disponibile, spawno un thread in modalità detached\n");
+                fflush(logFile);
+                UNLOCK(&logLock);
                 int rep;
                 rep = spawnThread(threadWorker, (void*)args);
                 if (rep != 0) {
@@ -692,6 +778,15 @@ int main (int argc, char **argv) {
 		}
 	    }
 	}
+    }
+    LOCK(&logLock);
+    fprintf(logFile, "-----STATISTICHE FINALI SERVER-----\nNumero massimo di file salvati contemporaneamente: %ld\nDimensione massima della memoria usata: %.2f MB\n"
+    "L'algoritmo di rimpiazzamento è stato usato %d volte\nI file presenti alla fine nello storage sono:\n", max_files, max_size_raggiunta/1000000, how_many_times);
+    icl_hash_dump_2(logFile, hTable);
+    fflush(logFile);
+    UNLOCK(&logLock);
+    if (fclose(logFile) != 0) {
+        fprintf(stderr, "SERVER: Errore nella chiusura del file di log\n");
     }
     if (sig_int_or_quit == 1) //libera la memoria senza aspettare che i thread finiscano
         destroy_everything(1);

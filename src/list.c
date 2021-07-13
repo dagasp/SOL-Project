@@ -5,7 +5,7 @@
 * key - pathname del file
 * desc - descrittore associato al client
 */
-void put_by_key(list **head, const char *key, int desc) {
+void put_by_key(list **head, const char *key, long desc) {
     list *tmp = malloc(sizeof(list));
     if (!tmp) {
         fprintf(stderr, "Errore nella malloc\n");
@@ -21,7 +21,7 @@ void put_by_key(list **head, const char *key, int desc) {
 * k - pathname del file
 * desc - descrittore associato al client
 */
-int delete_by_key(list **head, char *k, int desc) {
+int delete_by_key(list **head, char *k, long desc) {
     list *tmp = *head;
     list *prev = NULL;
     if (*head == NULL || head == NULL) return 0;

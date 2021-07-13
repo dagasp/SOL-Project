@@ -49,23 +49,23 @@ config_file *read_config(char *config) {
             case 2:
                 conf->num_of_files = atoi(buf);
                 break;
-            case 3: ;
-                /*if (isNumber(buf, &num) == 0) {
-                    fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
-                    return NULL;
-                }*/
+            case 3: {
                 char *tmp = buf;
                 char *token = strtok(tmp, "\r\n"); //Serve a pulire la stringa togliendo lo /n o /r
                 strcpy(conf->sock_name, token);
                 //printf("%s\n", conf->sock_name);
                 break;
-            //case 4:
+            }
                 /*if (isNumber(buf, &num) == 0) {
-                    fprintf(stderr, "Errore nel config file, il parametro 'directory' non è una stringa!\n");
+                    fprintf(stderr, "Errore nel config file, il parametro 'sockname' non è una stringa!\n");
                     return NULL;
                 }*/
-                //strncpy(conf->directory, buf, BUFSIZE);
-                //break;
+            case 4: {
+                char *tmp = buf;
+                char *token = strtok(tmp, "\r\n"); //Serve a pulire la stringa togliendo lo /n o /r
+                strcpy(conf->log_file, token);
+                break;
+            }
             default: ;
                 break;
         }

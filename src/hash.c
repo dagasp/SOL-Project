@@ -356,7 +356,7 @@ icl_hash_destroy(icl_hash_t *ht, void (*free_key)(void*), void (*free_data)(void
             curr=next;
         }
     }
-
+    pthread_mutex_destroy(&ht->tableLock);
     if(ht->buckets) free(ht->buckets);
     if(ht) free(ht);
 
@@ -413,7 +413,7 @@ icl_hash_dump_2(FILE* stream, icl_hash_t* ht)
 
     if(!ht) return -1;
     
-    fprintf(stream, "\n\nSERVER: File presenti al momento nello storage:\n");
+    //fprintf(stream, "\n\nSERVER: File presenti al momento nello storage:\n");
     for(i=0; i<ht->nbuckets; i++) {
         bucket = ht->buckets[i];
         for(curr=bucket; curr!=NULL; ) {

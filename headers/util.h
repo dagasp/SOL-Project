@@ -64,6 +64,7 @@ typedef struct config_file {
     unsigned int num_of_threads;
     unsigned int num_of_files;
     char sock_name[BUFSIZE];
+    char log_file[BUFSIZE];
 } config_file;
 
 typedef struct client_operations {

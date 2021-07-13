@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "Welcome to Test2"; 
-echo -e "4\n1000000\n10\ncs_sock" > ./test/config.txt #Setta i parametri del file config.txt
+echo -e "4\n1000000\n10\ncs_sock\nServerLog.txt" > ./test/config.txt #Setta i parametri del file config.txt
 
 SERVER_CMD=./file_storage_server #Eseguibile del server
 CLIENT_CMD=./client #Eseguibile del client

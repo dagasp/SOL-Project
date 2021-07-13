@@ -13,7 +13,7 @@ enum STATUS {
 
 typedef struct node {
     char pathname[MAX_PATH];
-    int descriptor;
+    long descriptor;
     int curr_size;
     int file_status;
     struct node *next;
@@ -21,11 +21,11 @@ typedef struct node {
 
 void init(list *list);
 
-void put_by_key (list **head, const char *key, int desc);
+void put_by_key (list **head, const char *key, long desc);
 int insert_file(list **head, char *path);
 char *get_last_file(list *l);
 int delete_last_element(list **head);
-int delete_by_key(list **head, char *k, int);
+int delete_by_key(list **head, char *k, long);
 void print_q(list *list);
 void list_destroy(list **head);
 int list_contain_file(list *list, char *, int);

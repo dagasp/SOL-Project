@@ -131,6 +131,33 @@ icl_hash_find(icl_hash_t *ht, void* key)
 
     return NULL;
 }
+
+/**
+ * Cerca un file nella tabella e ritorna la sua dimensione
+ *
+ * @param ht -- the hash table to be searched
+ * @param key -- the key of the item to search for
+ *
+ * @returns file's size.
+ *   If the key was not found, returns -1.
+ */
+size_t
+icl_hash_get_file_size(icl_hash_t *ht, void* key)
+{
+    icl_entry_t* curr;
+    unsigned int hash_val;
+
+    if(!ht || !key) return -1;
+
+    hash_val = (* ht->hash_function)(key) % ht->nbuckets;
+
+    for (curr=ht->buckets[hash_val]; curr != NULL; curr=curr->next)
+        if ( ht->hash_key_compare(curr->key, key))
+            return(curr->fileSize);
+
+    return -1;
+}
+
 int 
 icl_hash_find_and_append(icl_hash_t *ht, void* key, void *data_to_append)
 {
@@ -246,7 +273,7 @@ icl_hash_insert(icl_hash_t *ht, void* key, void *data, size_t size)
 
     curr->key = key;
     curr->data = data;
-    curr->modified = 1;
+    curr->fileSize = size;
     curr->next = ht->buckets[hash_val]; /* add at start */
     ht->buckets[hash_val] = curr;
     ht->nentries++;
@@ -360,7 +387,8 @@ icl_hash_dump(long connFd, icl_hash_t* ht, int n_of_files)
         for(curr=bucket; curr!=NULL; ) {
             if(curr->key && file_readed <= n_of_files) {
                 strcpy(server_rep.pathname, (char*)curr->key);
-                strcpy(server_rep.data, (char*)curr->data);
+                memcpy(server_rep.data, curr->data, curr->fileSize+1);
+                server_rep.size = curr->fileSize; //Prendo la size del file
                 if (writen(connFd, &server_rep, sizeof(server_reply)) < 0) {
                     perror("writenDump");
                     return -1;
